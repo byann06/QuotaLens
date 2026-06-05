@@ -6,4 +6,7 @@
     <Nullable>enable</Nullable>
     <AssemblyName>QuotaLens.PerAppUsageHelper</AssemblyName>
   </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Database.ManagedEsent" Version="2.0.0" />
+  </ItemGroup>
 </Project>

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, Menu, Notification, Tray, nativeImage, shell } from 'electron';
+import { app, BrowserWindow, ipcMain, Menu, Notification, Tray, nativeImage, screen, shell } from 'electron';
 import { existsSync } from 'node:fs';
 import { writeFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -19,6 +19,7 @@ import { formatTranslation, normalizeLanguage, translate } from './i18n';
 import {
   getSettingsFilePath,
   initializeSettingsStore,
+  miniBarDefaultSettings,
   readSettings,
   updateSettings,
 } from './settingsStore';
@@ -43,6 +44,7 @@ if (!gotSingleInstanceLock) {
 }
 
 let mainWindow;
+let miniBarWindow;
 let tray;
 let isQuitting = false;
 const notificationState = {
@@ -87,6 +89,230 @@ const showMainWindow = () => {
   mainWindow.focus();
 };
 
+const loadRenderer = (window, query = {}) => {
+  if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
+    const url = new URL(MAIN_WINDOW_VITE_DEV_SERVER_URL);
+
+    Object.entries(query).forEach(([key, value]) => {
+      url.searchParams.set(key, value);
+    });
+
+    window.loadURL(url.toString());
+    return;
+  }
+
+  window.loadFile(path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`), {
+    query,
+  });
+};
+
+const miniBarSizeByName = {
+  compact: { width: 520, height: 44 },
+  normal: { width: 640, height: 52 },
+  wide: { width: 680, height: 56 },
+};
+
+let isApplyingMiniBarBounds = false;
+let miniBarMoveSaveTimerId;
+
+const getMiniBarSize = (settings) =>
+  miniBarSizeByName[settings.miniBarSize] || miniBarSizeByName.normal;
+
+const getMiniBarBoundsForPosition = (settings) => {
+  const size = getMiniBarSize(settings);
+
+  if (settings.miniBarPosition === 'custom' && settings.miniBarCustomBounds) {
+    return {
+      ...size,
+      x: settings.miniBarCustomBounds.x,
+      y: settings.miniBarCustomBounds.y,
+    };
+  }
+
+  const display = screen.getPrimaryDisplay();
+  const workArea = display.workArea;
+  const margin = 16;
+  const horizontalRight = workArea.x + workArea.width - size.width - margin;
+  const verticalBottom = workArea.y + workArea.height - size.height - margin;
+
+  const positions = {
+    'top-left': {
+      x: workArea.x + margin,
+      y: workArea.y + margin,
+    },
+    'top-right': {
+      x: horizontalRight,
+      y: workArea.y + margin,
+    },
+    'bottom-left': {
+      x: workArea.x + margin,
+      y: verticalBottom,
+    },
+    'bottom-right': {
+      x: horizontalRight,
+      y: verticalBottom,
+    },
+  };
+
+  return {
+    ...size,
+    ...(positions[settings.miniBarPosition] || positions['top-right']),
+  };
+};
+
+const applyMiniBarSettings = (settings) => {
+  if (!miniBarWindow || miniBarWindow.isDestroyed()) {
+    return;
+  }
+
+  if (!settings.miniBarEnabled) {
+    miniBarWindow.hide();
+    return;
+  }
+
+  const bounds = getMiniBarBoundsForPosition(settings);
+
+  isApplyingMiniBarBounds = true;
+  miniBarWindow.setBounds(bounds);
+  setTimeout(() => {
+    isApplyingMiniBarBounds = false;
+  }, 100);
+  miniBarWindow.setOpacity(Number(settings.miniBarOpacity) || 0.95);
+  miniBarWindow.setAlwaysOnTop(Boolean(settings.miniBarAlwaysOnTop), 'floating');
+
+  if (typeof miniBarWindow.setMovable === 'function') {
+    miniBarWindow.setMovable(!settings.miniBarLockPosition);
+  }
+};
+
+const showMiniBarWindow = async () => {
+  const settings = await readSettings();
+
+  if (!settings.miniBarEnabled) {
+    return {
+      ok: false,
+      error: 'Mini Bar is disabled in settings.',
+    };
+  }
+
+  if (!miniBarWindow || miniBarWindow.isDestroyed()) {
+    const size = getMiniBarSize(settings);
+    miniBarWindow = new BrowserWindow({
+      width: size.width,
+      height: size.height,
+      minWidth: miniBarSizeByName.compact.width,
+      minHeight: miniBarSizeByName.compact.height,
+      maxWidth: miniBarSizeByName.wide.width,
+      maxHeight: miniBarSizeByName.wide.height,
+      show: false,
+      title: 'QuotaLens Mini Bar',
+      backgroundColor: '#0f172a',
+      frame: false,
+      transparent: false,
+      alwaysOnTop: settings.miniBarAlwaysOnTop,
+      skipTaskbar: true,
+      resizable: false,
+      maximizable: false,
+      minimizable: false,
+      fullscreenable: false,
+      autoHideMenuBar: true,
+      webPreferences: {
+        preload: path.join(__dirname, 'preload.js'),
+        contextIsolation: true,
+        nodeIntegration: false,
+      },
+    });
+
+    miniBarWindow.removeMenu();
+    miniBarWindow.setMenuBarVisibility(false);
+    applyMiniBarSettings(settings);
+
+    miniBarWindow.on('close', (event) => {
+      if (!isQuitting) {
+        event.preventDefault();
+        miniBarWindow.hide();
+      }
+    });
+
+    miniBarWindow.on('closed', () => {
+      miniBarWindow = null;
+    });
+
+    miniBarWindow.on('moved', () => {
+      if (isApplyingMiniBarBounds || !miniBarWindow || miniBarWindow.isDestroyed()) {
+        return;
+      }
+
+      clearTimeout(miniBarMoveSaveTimerId);
+      miniBarMoveSaveTimerId = setTimeout(async () => {
+        try {
+          const latestSettings = await readSettings();
+
+          if (latestSettings.miniBarLockPosition) {
+            return;
+          }
+
+          await updateSettings({
+            miniBarPosition: 'custom',
+            miniBarCustomBounds: miniBarWindow.getBounds(),
+          });
+        } catch (error) {
+          console.debug('QuotaLens failed to save Mini Bar custom position:', error);
+        }
+      }, 250);
+    });
+
+    loadRenderer(miniBarWindow, { mode: 'mini' });
+  }
+
+  applyMiniBarSettings(settings);
+
+  miniBarWindow.show();
+  miniBarWindow.focus();
+
+  return { ok: true };
+};
+
+const hideMiniBarWindow = () => {
+  if (miniBarWindow && !miniBarWindow.isDestroyed()) {
+    miniBarWindow.hide();
+  }
+
+  return { ok: true };
+};
+
+const createDesktopShortcut = () => {
+  if (!app.isPackaged) {
+    return {
+      ok: false,
+      isPackaged: false,
+      error: 'Desktop shortcut is only available for packaged QuotaLens builds.',
+    };
+  }
+
+  const desktopPath = app.getPath('desktop');
+  const shortcutPath = path.join(desktopPath, 'QuotaLens.lnk');
+  const targetPath = process.execPath;
+  const shortcutCreated = shell.writeShortcutLink(shortcutPath, 'create', {
+    target: targetPath,
+    cwd: path.dirname(targetPath),
+    description: 'QuotaLens Desktop Quota Monitor',
+    icon: targetPath,
+    iconIndex: 0,
+    appUserModelId: 'QuotaLens',
+  });
+
+  if (!shortcutCreated) {
+    throw new Error('Windows did not create the desktop shortcut.');
+  }
+
+  return {
+    ok: true,
+    isPackaged: true,
+    shortcutPath,
+  };
+};
+
 app.on('second-instance', () => {
   showMainWindow();
 });
@@ -103,6 +329,10 @@ const toggleMainWindow = () => {
 const sendMonitoringCommand = (command) => {
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send('quotalens:monitoring-command', command);
+  }
+
+  if (miniBarWindow && !miniBarWindow.isDestroyed()) {
+    miniBarWindow.webContents.send('quotalens:monitoring-command', command);
   }
 };
 
@@ -174,6 +404,14 @@ const summarizeSettings = (settings) => ({
   monitorOnlyListedSsids: settings.monitorOnlyListedSsids,
   launchAtStartup: settings.launchAtStartup,
   startMinimizedToTray: settings.startMinimizedToTray,
+  developerMode: settings.developerMode,
+  miniBarEnabled: settings.miniBarEnabled,
+  miniBarAlwaysOnTop: settings.miniBarAlwaysOnTop,
+  miniBarOpacity: settings.miniBarOpacity,
+  miniBarSize: settings.miniBarSize,
+  miniBarLayout: settings.miniBarLayout,
+  miniBarPosition: settings.miniBarPosition,
+  miniBarLockPosition: settings.miniBarLockPosition,
   language: settings.language,
 });
 
@@ -301,12 +539,7 @@ const createWindow = ({ show = true } = {}) => {
     mainWindow = null;
   });
 
-  // and load the index.html of the app.
-  if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
-    mainWindow.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL);
-  } else {
-    mainWindow.loadFile(path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`));
-  }
+  loadRenderer(mainWindow);
 };
 
 // This method will be called when Electron has finished
@@ -420,6 +653,7 @@ app.whenReady().then(async () => {
     try {
       const savedSettings = await updateSettings(settings);
       refreshTrayMenu(savedSettings.language);
+      applyMiniBarSettings(savedSettings);
       return { ok: true, settings: savedSettings };
     } catch (error) {
       return {
@@ -616,10 +850,11 @@ app.whenReady().then(async () => {
     }
   });
 
-  ipcMain.handle('quotalens:get-real-per-app-usage', async () => {
+  ipcMain.handle('quotalens:get-real-per-app-usage', async (_event, options = {}) => {
     try {
       const perAppUsage = await getRealPerAppUsage({
         appPath: app.getAppPath(),
+        period: options?.period,
       });
 
       return { ok: true, perAppUsage };
@@ -658,6 +893,83 @@ app.whenReady().then(async () => {
         error: error.message || 'Failed to open data folder.',
       };
     }
+  });
+
+  ipcMain.handle('quotalens:create-desktop-shortcut', async () => {
+    try {
+      return createDesktopShortcut();
+    } catch (error) {
+      return {
+        ok: false,
+        isPackaged: app.isPackaged,
+        error: error.message || 'Failed to create desktop shortcut.',
+      };
+    }
+  });
+
+  ipcMain.handle('quotalens:open-mini-bar', async () => {
+    try {
+      return showMiniBarWindow();
+    } catch (error) {
+      return {
+        ok: false,
+        error: error.message || 'Failed to open Mini Bar.',
+      };
+    }
+  });
+
+  ipcMain.handle('quotalens:hide-mini-bar', async () => hideMiniBarWindow());
+
+  ipcMain.handle('quotalens:update-mini-bar-settings', async (_event, miniBarSettings) => {
+    try {
+      const settings = await updateSettings(miniBarSettings);
+
+      applyMiniBarSettings(settings);
+
+      return { ok: true, settings };
+    } catch (error) {
+      return {
+        ok: false,
+        error: error.message || 'Failed to update Mini Bar settings.',
+      };
+    }
+  });
+
+  ipcMain.handle('quotalens:reset-mini-bar-settings', async () => {
+    try {
+      const settings = await updateSettings(miniBarDefaultSettings);
+
+      applyMiniBarSettings(settings);
+
+      return { ok: true, settings };
+    } catch (error) {
+      return {
+        ok: false,
+        error: error.message || 'Failed to reset Mini Bar settings.',
+      };
+    }
+  });
+
+  ipcMain.handle('quotalens:set-mini-bar-position', async (_event, position) => {
+    try {
+      const settings = await updateSettings({
+        miniBarPosition: position,
+      });
+
+      applyMiniBarSettings(settings);
+
+      return { ok: true, settings };
+    } catch (error) {
+      return {
+        ok: false,
+        error: error.message || 'Failed to set Mini Bar position.',
+      };
+    }
+  });
+
+  ipcMain.handle('quotalens:show-main-window', async () => {
+    showMainWindow();
+    return { ok: true };
   });
 
   ipcMain.handle('quotalens:export-diagnostics', async () => {

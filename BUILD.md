@@ -10,7 +10,9 @@ Jalankan aplikasi dalam mode development:
 npm start
 ```
 
-Perintah ini menjalankan Electron Forge dengan pipeline Vite untuk renderer/dev.
+Perintah ini hanya untuk development. `npm start` menjalankan Electron Forge dengan pipeline Vite untuk renderer/dev, bukan membuat aplikasi yang muncul di Desktop Windows.
+
+Untuk verifikasi build harian, tidak perlu menjalankan `npm start` terus-menerus. Gunakan `node --check`, `dotnet build`, `npm run package`, dan `npm run make` sesuai kebutuhan.
 
 ## Membuat Packaged App
 
@@ -32,6 +34,48 @@ Jalankan packaged app dari:
 out/QuotaLens-win32-x64/QuotaLens.exe
 ```
 
+Packaged app ini adalah aplikasi desktop yang bisa dibuka langsung tanpa `npm start`.
+
+Jika proses package gagal karena file di folder `out` atau `.vite` sedang dipakai, tutup QuotaLens yang sedang berjalan terlebih dahulu, termasuk dari menu tray `Quit`, lalu jalankan ulang `npm run package`.
+
+## Membuat Shortcut Desktop
+
+Setelah `npm run package` berhasil, shortcut Desktop bisa dibuat dengan salah satu cara berikut:
+
+1. Buka folder `out/QuotaLens-win32-x64/`.
+2. Klik kanan `QuotaLens.exe`.
+3. Pilih `Show more options`, lalu `Send to > Desktop (create shortcut)`.
+
+Atau dari aplikasi packaged:
+
+1. Jalankan `out/QuotaLens-win32-x64/QuotaLens.exe`.
+2. Buka panel `Perilaku Aplikasi / Startup`.
+3. Klik tombol `Buat Shortcut Desktop`.
+
+Tombol shortcut hanya tersedia untuk packaged app. Saat mode development, QuotaLens akan menampilkan pesan bahwa shortcut Desktop dibuat dari hasil package.
+
+## Run As Administrator
+
+QuotaLens utama bisa dibuka normal tanpa Administrator. Dashboard, monitoring sesi, Wi-Fi/SSID, history, tray, dan pengaturan tetap berjalan seperti biasa.
+
+Fitur `Pemakaian Kuota per Aplikasi (Eksperimental)` membaca riwayat Windows SRUM. Di beberapa laptop, Windows membatasi akses SRUM sehingga panel ini perlu Administrator. Jika akses ditolak, hanya panel tersebut yang menampilkan pesan butuh Administrator; aplikasi utama tidak boleh ikut crash.
+
+Cara menjalankan sebagai Administrator:
+
+1. Klik kanan `QuotaLens.exe` atau shortcut Desktop QuotaLens.
+2. Pilih `Run as administrator`.
+3. Terima prompt UAC Windows jika muncul.
+
+Jika tidak dijalankan sebagai Administrator dan SRUM ditolak, QuotaLens tidak seharusnya crash. Hanya panel per-app usage yang akan menampilkan pesan bahwa akses Administrator dibutuhkan.
+
+## Mini Bar Dan Developer Mode
+
+Mini Bar dibuat sebagai overlay kecil untuk memantau kuota tanpa membuka window utama. Mini Bar bersifat frameless, always-on-top jika setting aktif, dan bisa disembunyikan tanpa menutup QuotaLens.
+
+Pengaturan Mini Bar ada di halaman `Pengaturan > Tampilan > Mini Bar`, termasuk ukuran, layout, posisi, opacity, lock posisi, data yang ditampilkan, dan tombol ikon yang tersedia.
+
+Developer Mode bisa diaktifkan dari halaman Pengaturan. Saat Developer Mode mati, detail teknis seperti diagnostics, path file, status parser SRUM, status copy/recovery, koneksi aktif per proses, dan estimator tidak ditampilkan di mode normal.
+
 ## Membuat Installer Dan ZIP Portable
 
 Buat output distribusi Windows:
@@ -50,6 +94,12 @@ Lokasi output umumnya:
 ```text
 out/make/squirrel.windows/x64/
 out/make/zip/win32/x64/
+```
+
+Output Squirrel biasanya berisi installer seperti:
+
+```text
+out/make/squirrel.windows/x64/QuotaLensSetup.exe
 ```
 
 ## Icon Aplikasi

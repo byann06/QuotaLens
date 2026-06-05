@@ -4,6 +4,27 @@ import { defaultLanguage, normalizeLanguage } from './i18n';
 
 const settingsFileName = 'quotalens-settings.json';
 
+export const miniBarDefaultSettings = {
+  miniBarEnabled: true,
+  miniBarAlwaysOnTop: true,
+  miniBarOpacity: 0.95,
+  miniBarSize: 'normal',
+  miniBarLayout: 'standard',
+  miniBarPosition: 'top-right',
+  miniBarLockPosition: false,
+  miniBarShowSsid: true,
+  miniBarShowTodayUsage: true,
+  miniBarShowSessionUsage: true,
+  miniBarShowTopApp: true,
+  miniBarShowStatus: true,
+  miniBarShowRefreshButton: true,
+  miniBarShowOpenButton: true,
+  miniBarShowResetButton: false,
+  miniBarShowHideButton: true,
+  miniBarUseShortLabels: true,
+  miniBarCustomBounds: null,
+};
+
 const defaultSettings = {
   dailyLimitBytes: 2147483648,
   sessionLimitBytes: 1073741824,
@@ -13,6 +34,8 @@ const defaultSettings = {
   monitorOnlyListedSsids: false,
   launchAtStartup: false,
   startMinimizedToTray: false,
+  developerMode: false,
+  ...miniBarDefaultSettings,
   language: defaultLanguage,
 };
 
@@ -52,6 +75,49 @@ const normalizeMonitoredSsids = (ssids) => {
   );
 };
 
+const normalizeNumberInRange = (value, fallback, min, max) => {
+  const numericValue = Number(value);
+
+  if (!Number.isFinite(numericValue)) {
+    return fallback;
+  }
+
+  return Math.min(max, Math.max(min, numericValue));
+};
+
+const normalizeChoice = (value, allowedValues, fallback) => {
+  const normalizedValue = String(value || '').trim();
+
+  return allowedValues.includes(normalizedValue) ? normalizedValue : fallback;
+};
+
+const normalizeMiniBarCustomBounds = (bounds) => {
+  if (!bounds || typeof bounds !== 'object') {
+    return null;
+  }
+
+  const x = Number(bounds.x);
+  const y = Number(bounds.y);
+  const width = Number(bounds.width);
+  const height = Number(bounds.height);
+
+  if (
+    !Number.isFinite(x) ||
+    !Number.isFinite(y) ||
+    !Number.isFinite(width) ||
+    !Number.isFinite(height)
+  ) {
+    return null;
+  }
+
+  return {
+    x: Math.round(x),
+    y: Math.round(y),
+    width: Math.round(width),
+    height: Math.round(height),
+  };
+};
+
 const normalizeSettings = (settings = {}) => ({
   dailyLimitBytes: toPositiveBytes(settings.dailyLimitBytes, defaultSettings.dailyLimitBytes),
   sessionLimitBytes: toPositiveBytes(settings.sessionLimitBytes, defaultSettings.sessionLimitBytes),
@@ -76,6 +142,82 @@ const normalizeSettings = (settings = {}) => ({
     typeof settings.startMinimizedToTray === 'boolean'
       ? settings.startMinimizedToTray
       : defaultSettings.startMinimizedToTray,
+  developerMode:
+    typeof settings.developerMode === 'boolean'
+      ? settings.developerMode
+      : defaultSettings.developerMode,
+  miniBarEnabled:
+    typeof settings.miniBarEnabled === 'boolean'
+      ? settings.miniBarEnabled
+      : defaultSettings.miniBarEnabled,
+  miniBarAlwaysOnTop:
+    typeof settings.miniBarAlwaysOnTop === 'boolean'
+      ? settings.miniBarAlwaysOnTop
+      : typeof settings.alwaysOnTopMiniBar === 'boolean'
+        ? settings.alwaysOnTopMiniBar
+        : defaultSettings.miniBarAlwaysOnTop,
+  miniBarOpacity: normalizeNumberInRange(
+    settings.miniBarOpacity,
+    defaultSettings.miniBarOpacity,
+    0.6,
+    1,
+  ),
+  miniBarSize: normalizeChoice(settings.miniBarSize, ['compact', 'normal', 'wide'], 'normal'),
+  miniBarLayout: normalizeChoice(
+    settings.miniBarLayout,
+    ['minimal', 'standard', 'detailed'],
+    'standard',
+  ),
+  miniBarPosition: normalizeChoice(
+    settings.miniBarPosition,
+    ['top-left', 'top-right', 'bottom-left', 'bottom-right', 'custom'],
+    'top-right',
+  ),
+  miniBarLockPosition:
+    typeof settings.miniBarLockPosition === 'boolean'
+      ? settings.miniBarLockPosition
+      : defaultSettings.miniBarLockPosition,
+  miniBarShowSsid:
+    typeof settings.miniBarShowSsid === 'boolean'
+      ? settings.miniBarShowSsid
+      : defaultSettings.miniBarShowSsid,
+  miniBarShowTodayUsage:
+    typeof settings.miniBarShowTodayUsage === 'boolean'
+      ? settings.miniBarShowTodayUsage
+      : defaultSettings.miniBarShowTodayUsage,
+  miniBarShowSessionUsage:
+    typeof settings.miniBarShowSessionUsage === 'boolean'
+      ? settings.miniBarShowSessionUsage
+      : defaultSettings.miniBarShowSessionUsage,
+  miniBarShowTopApp:
+    typeof settings.miniBarShowTopApp === 'boolean'
+      ? settings.miniBarShowTopApp
+      : defaultSettings.miniBarShowTopApp,
+  miniBarShowStatus:
+    typeof settings.miniBarShowStatus === 'boolean'
+      ? settings.miniBarShowStatus
+      : defaultSettings.miniBarShowStatus,
+  miniBarShowRefreshButton:
+    typeof settings.miniBarShowRefreshButton === 'boolean'
+      ? settings.miniBarShowRefreshButton
+      : defaultSettings.miniBarShowRefreshButton,
+  miniBarShowOpenButton:
+    typeof settings.miniBarShowOpenButton === 'boolean'
+      ? settings.miniBarShowOpenButton
+      : defaultSettings.miniBarShowOpenButton,
+  miniBarShowResetButton:
+    typeof settings.miniBarShowResetButton === 'boolean'
+      ? settings.miniBarShowResetButton
+      : defaultSettings.miniBarShowResetButton,
+  miniBarShowHideButton:
+    typeof settings.miniBarShowHideButton === 'boolean'
+      ? settings.miniBarShowHideButton
+      : defaultSettings.miniBarShowHideButton,
+  miniBarUseShortLabels:
+    typeof settings.miniBarUseShortLabels === 'boolean'
+      ? settings.miniBarUseShortLabels
+      : defaultSettings.miniBarUseShortLabels,
+  miniBarCustomBounds: normalizeMiniBarCustomBounds(settings.miniBarCustomBounds),
   language: normalizeLanguage(settings.language),
 });
 

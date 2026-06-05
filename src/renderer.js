@@ -15,10 +15,29 @@ const fallbackSettings = {
   monitorOnlyListedSsids: false,
   launchAtStartup: false,
   startMinimizedToTray: false,
+  developerMode: false,
+  miniBarEnabled: true,
+  miniBarAlwaysOnTop: true,
+  miniBarOpacity: 0.95,
+  miniBarSize: 'normal',
+  miniBarLayout: 'standard',
+  miniBarPosition: 'top-right',
+  miniBarLockPosition: false,
+  miniBarShowSsid: true,
+  miniBarShowTodayUsage: true,
+  miniBarShowSessionUsage: true,
+  miniBarShowTopApp: true,
+  miniBarShowStatus: true,
+  miniBarShowRefreshButton: true,
+  miniBarShowOpenButton: true,
+  miniBarShowResetButton: false,
+  miniBarShowHideButton: true,
+  miniBarUseShortLabels: true,
   language: 'id',
 };
 
 let currentLanguage = fallbackSettings.language;
+const isMiniBarWindow = new URLSearchParams(window.location.search).get('mode') === 'mini';
 
 const t = (key) => translate(currentLanguage, key);
 const tf = (key, values = {}) => formatTranslation(currentLanguage, key, values);
@@ -89,6 +108,16 @@ const gbInputToBytes = (value, fallbackBytes) => {
   }
 
   return Math.round(numericValue * bytesPerGb);
+};
+
+const normalizeOpacityInput = (value, fallback = fallbackSettings.miniBarOpacity) => {
+  const numericValue = Number(value);
+
+  if (!Number.isFinite(numericValue)) {
+    return fallback;
+  }
+
+  return Math.min(1, Math.max(0.6, numericValue));
 };
 
 const getLimitStatus = (usageBytes, limitBytes) => {
@@ -177,9 +206,42 @@ const escapeHtml = (value) =>
     .replaceAll('"', '&quot;')
     .replaceAll("'", '&#039;');
 
+document.body.classList.toggle('mini-mode', isMiniBarWindow);
+
 app.innerHTML = `
   <section class="shell">
-    <header class="topbar">
+    <section class="mini-bar-panel" aria-live="polite">
+      <div class="mini-drag-strip">
+        <strong class="mini-brand">QuotaLens</strong>
+        <span class="mini-dot">·</span>
+        <span class="mini-ssid" id="miniWifiSsid">Mendeteksi...</span>
+        <span class="mini-metric" id="miniTodayGroup"><b data-i18n="mini.todayShort" id="miniTodayLabel">Hari ini</b> <strong id="miniTodayUsage">-</strong></span>
+        <span class="mini-metric" id="miniSessionGroup"><b data-i18n="mini.sessionShort" id="miniSessionLabel">Sesi</b> <strong id="miniSessionUsage">-</strong></span>
+        <span class="mini-metric mini-top-app" id="miniTopAppGroup"><b data-i18n="mini.topShort" id="miniTopLabel">Top</b> <strong id="miniTopApp">-</strong></span>
+        <span class="mini-status" id="miniLimitStatus">-</span>
+      </div>
+      <div class="mini-actions">
+        <button class="mini-icon-button" data-title-i18n="button.refreshStats" id="miniRefreshButton" type="button">⟳</button>
+        <button class="mini-icon-button" data-title-i18n="button.openMainApp" id="miniOpenMainButton" type="button">↗</button>
+        <button class="mini-icon-button" data-title-i18n="button.resetSession" id="miniResetButton" type="button">↺</button>
+        <button class="mini-icon-button danger" data-title-i18n="button.hideMiniBar" id="miniHideButton" type="button">×</button>
+      </div>
+    </section>
+
+    <nav class="app-sidebar">
+      <div class="sidebar-brand">
+        <strong>QuotaLens</strong>
+        <span data-i18n="app.tagline">Pemantau Kuota Desktop</span>
+      </div>
+      <button class="nav-button active" data-page-target="dashboard" data-i18n="nav.dashboard" type="button">Beranda</button>
+      <button class="nav-button" data-page-target="apps" data-i18n="nav.apps" type="button">Pemakaian Aplikasi</button>
+      <button class="nav-button" data-page-target="history" data-i18n="nav.history" type="button">Riwayat</button>
+      <button class="nav-button" data-page-target="settings" data-i18n="nav.settings" type="button">Pengaturan</button>
+      <button class="nav-button developer-nav" data-page-target="developer" data-i18n="nav.developer" type="button">Developer</button>
+    </nav>
+
+    <main class="app-content">
+    <header class="topbar" data-page="dashboard">
       <div>
         <p class="eyebrow" data-i18n="app.tagline">Pemantau Kuota Desktop</p>
         <h1>QuotaLens</h1>
@@ -190,7 +252,7 @@ app.innerHTML = `
       </div>
     </header>
 
-    <section class="hero">
+    <section class="hero" data-page="dashboard">
       <div class="hero-copy">
         <p class="section-label" data-i18n="hero.activeConnection">Koneksi Aktif</p>
         <h2 id="adapterName">Membaca koneksi...</h2>
@@ -214,6 +276,7 @@ app.innerHTML = `
         <div class="toolbar">
           <button class="refresh-button" data-i18n="button.refreshStats" id="refreshButton" type="button">Segarkan Statistik</button>
           <button class="secondary-button" data-i18n="button.resetSession" id="resetButton" type="button">Reset Sesi</button>
+          <button class="secondary-button" data-i18n="button.openMiniBar" id="openMiniBarButton" type="button">Buka Mini Bar</button>
           <button class="secondary-button" id="monitoringButton" type="button">Jeda Monitoring</button>
           <label class="interval-control">
             <span data-i18n="label.refresh">Segarkan</span>
@@ -232,9 +295,9 @@ app.innerHTML = `
       </div>
     </section>
 
-    <p class="error-message" id="errorMessage" role="alert"></p>
+    <p class="error-message" id="errorMessage" role="alert" data-page="dashboard apps history settings developer"></p>
 
-    <section class="stats-grid" aria-live="polite">
+    <section class="stats-grid" aria-live="polite" data-page="dashboard">
       <article class="stat-card">
         <span data-i18n="metric.todayUsage">Pemakaian Hari Ini</span>
         <strong id="todayUsage">0 MB</strong>
@@ -254,7 +317,20 @@ app.innerHTML = `
       </article>
     </section>
 
-    <section class="details-panel">
+    <section class="home-top-apps" data-page="dashboard">
+      <div class="section-heading">
+        <div>
+          <p class="section-label" data-i18n="dashboard.topApps">Top 3 Aplikasi Boros</p>
+          <h3 data-i18n="dashboard.topAppsSubtitle">Ringkasan dari riwayat SRUM</h3>
+        </div>
+        <button class="secondary-button" data-page-target="apps" data-i18n="button.viewAllApps" type="button">Lihat Semua</button>
+      </div>
+      <div class="top-apps-list" id="dashboardTopAppsList">
+        <p class="history-empty" data-i18n="dashboard.topAppsEmpty">Data aplikasi belum tersedia.</p>
+      </div>
+    </section>
+
+    <section class="details-panel developer-only" data-page="developer">
       <div>
         <span data-i18n="metric.startedAt">Mulai Pada</span>
         <strong id="startedAt">-</strong>
@@ -289,7 +365,7 @@ app.innerHTML = `
       </div>
     </section>
 
-    <section class="chart-panel">
+    <section class="chart-panel" data-page="history">
       <div class="chart-header">
         <div>
           <p class="section-label" data-i18n="chart.title">Grafik Pemakaian</p>
@@ -325,7 +401,7 @@ app.innerHTML = `
       <p class="settings-note" id="chartNote"></p>
     </section>
 
-    <section class="suspects-panel">
+    <section class="suspects-panel developer-only" data-page="developer">
       <div class="suspects-header">
         <div>
           <p class="section-label" data-i18n="suspects.title">Aplikasi yang Sedang Terhubung ke Internet</p>
@@ -342,7 +418,7 @@ app.innerHTML = `
       <p class="settings-note" id="suspectsStatus">-</p>
     </section>
 
-    <section class="estimates-panel">
+    <section class="estimates-panel developer-only" data-page="developer">
       <div class="estimates-header">
         <div>
           <p class="section-label" data-i18n="estimates.title">Perkiraan Penyebab Pemakaian Kuota</p>
@@ -376,13 +452,24 @@ app.innerHTML = `
       <p class="settings-note" id="estimatesStatus">-</p>
     </section>
 
-    <section class="per-app-panel">
+    <section class="per-app-panel" data-page="apps developer">
       <div class="per-app-header">
         <div>
           <p class="section-label" data-i18n="perApp.title">Pemakaian Kuota per Aplikasi (Eksperimental)</p>
           <h3 data-i18n="perApp.subtitle">Prototype pembacaan byte per proses</h3>
         </div>
-        <button class="secondary-button" data-i18n="button.refreshPerAppUsage" id="refreshRealPerAppUsageButton" type="button">Segarkan Per Aplikasi</button>
+        <div class="per-app-actions">
+          <label>
+            <span data-i18n="perApp.periodFilter">Periode</span>
+            <select id="realPerAppPeriodSelect">
+              <option data-i18n="perApp.periodToday" value="today">Hari ini</option>
+              <option data-i18n="perApp.period7d" selected value="7d">7 hari terakhir</option>
+              <option data-i18n="perApp.period30d" value="30d">30 hari terakhir</option>
+              <option data-i18n="perApp.periodAll" value="all">Semua riwayat</option>
+            </select>
+          </label>
+          <button class="secondary-button" data-i18n="button.refreshPerAppUsage" id="refreshRealPerAppUsageButton" type="button">Segarkan Per Aplikasi</button>
+        </div>
       </div>
       <p class="per-app-note" data-i18n="perApp.note">
         Panel ini hanya menampilkan data MB/GB per aplikasi jika helper native punya sumber data byte yang valid.
@@ -396,13 +483,17 @@ app.innerHTML = `
           <span data-i18n="perApp.sourceMethod">Metode Sumber</span>
           <strong id="realPerAppUsageSource">-</strong>
         </div>
-        <div>
+        <div class="developer-only">
           <span data-i18n="perApp.accessStatus">Status Akses SRUM</span>
           <strong id="realPerAppAccessStatus">-</strong>
         </div>
-        <div>
+        <div class="developer-only">
           <span data-i18n="perApp.parseStatus">Status Parser</span>
           <strong id="realPerAppParseStatus">-</strong>
+        </div>
+        <div>
+          <span data-i18n="perApp.activePeriod">Periode Aktif</span>
+          <strong id="realPerAppPeriodActive">7 hari terakhir</strong>
         </div>
       </div>
       <p class="per-app-unsupported" id="realPerAppUsageReason"></p>
@@ -412,28 +503,39 @@ app.innerHTML = `
       <p class="settings-note" id="realPerAppUsageNote">-</p>
     </section>
 
-    <section class="history-panel">
+    <section class="history-panel" data-page="history">
       <div class="history-header">
         <div>
           <p class="section-label" data-i18n="history.title">Riwayat Lokal</p>
           <h3 data-i18n="history.recentSessions">Sesi Terbaru</h3>
         </div>
-        <button class="danger-button" data-i18n="button.clearHistory" id="clearHistoryButton" type="button">Hapus Riwayat</button>
+        <div class="history-actions">
+          <label>
+            <span data-i18n="history.filter">Filter</span>
+            <select id="historyFilterSelect">
+              <option data-i18n="history.filterRecent" value="recent">Sesi terbaru</option>
+              <option data-i18n="label.today" value="today">Hari ini</option>
+              <option data-i18n="history.filterAll" value="all">Semua</option>
+            </select>
+          </label>
+          <button class="danger-button" data-i18n="button.clearHistory" id="clearHistoryButton" type="button">Hapus Riwayat</button>
+        </div>
       </div>
       <div class="history-list" id="historyList">
         <p class="history-empty" data-i18n="history.empty">Belum ada sesi yang selesai.</p>
       </div>
     </section>
 
-    <section class="settings-panel">
+    <section class="settings-panel" data-page="settings">
       <div class="settings-header">
         <div>
-          <p class="section-label" data-i18n="settings.title">Pengaturan</p>
+          <p class="section-label" data-i18n="settings.general">Umum</p>
           <h3 data-i18n="settings.limitWarning">Peringatan Batas</h3>
         </div>
         <button class="refresh-button" data-i18n="button.saveSettings" id="saveSettingsButton" type="button">Simpan Pengaturan</button>
       </div>
       <div class="settings-grid">
+        <p class="settings-group-title" data-i18n="settings.monitoring">Monitoring</p>
         <label>
           <span data-i18n="settings.dailyLimit">Batas Harian (GB)</span>
           <input id="dailyLimitInput" min="0.1" step="0.1" type="number" />
@@ -442,6 +544,11 @@ app.innerHTML = `
           <span data-i18n="settings.sessionLimit">Batas Sesi (GB)</span>
           <input id="sessionLimitInput" min="0.1" step="0.1" type="number" />
         </label>
+        <label class="toggle-control">
+          <input id="notificationsEnabledInput" type="checkbox" />
+          <span data-i18n="settings.notificationsEnabled">Notifikasi Aktif</span>
+        </label>
+        <p class="settings-group-title" data-i18n="settings.display">Tampilan</p>
         <label>
           <span data-i18n="settings.language">Bahasa</span>
           <select id="languageSelect">
@@ -450,9 +557,97 @@ app.innerHTML = `
           </select>
         </label>
         <label class="toggle-control">
-          <input id="notificationsEnabledInput" type="checkbox" />
-          <span data-i18n="settings.notificationsEnabled">Notifikasi Aktif</span>
+          <input id="developerModeInput" type="checkbox" />
+          <span data-i18n="settings.developerMode">Developer Mode</span>
         </label>
+        <p class="settings-group-title" data-i18n="settings.miniBar">Mini Bar</p>
+        <label class="toggle-control">
+          <input id="miniBarEnabledInput" type="checkbox" />
+          <span data-i18n="settings.miniBarEnabled">Aktifkan Mini Bar</span>
+        </label>
+        <label class="toggle-control">
+          <input id="miniBarAlwaysOnTopInput" type="checkbox" />
+          <span data-i18n="settings.miniBarAlwaysOnTop">Selalu di atas</span>
+        </label>
+        <label>
+          <span data-i18n="settings.miniBarSize">Ukuran</span>
+          <select id="miniBarSizeSelect">
+            <option data-i18n="settings.miniBarSizeCompact" value="compact">Compact</option>
+            <option data-i18n="settings.miniBarSizeNormal" value="normal">Normal</option>
+            <option data-i18n="settings.miniBarSizeWide" value="wide">Wide</option>
+          </select>
+        </label>
+        <label>
+          <span data-i18n="settings.miniBarLayout">Layout</span>
+          <select id="miniBarLayoutSelect">
+            <option data-i18n="settings.miniBarLayoutMinimal" value="minimal">Minimal</option>
+            <option data-i18n="settings.miniBarLayoutStandard" value="standard">Standard</option>
+            <option data-i18n="settings.miniBarLayoutDetailed" value="detailed">Detailed</option>
+          </select>
+        </label>
+        <label>
+          <span data-i18n="settings.miniBarPosition">Posisi</span>
+          <select id="miniBarPositionSelect">
+            <option data-i18n="settings.positionTopLeft" value="top-left">Kiri atas</option>
+            <option data-i18n="settings.positionTopRight" value="top-right">Kanan atas</option>
+            <option data-i18n="settings.positionBottomLeft" value="bottom-left">Kiri bawah</option>
+            <option data-i18n="settings.positionBottomRight" value="bottom-right">Kanan bawah</option>
+            <option data-i18n="settings.positionCustom" value="custom">Custom</option>
+          </select>
+        </label>
+        <label>
+          <span data-i18n="settings.miniBarOpacity">Opacity Mini Bar</span>
+          <input id="miniBarOpacityInput" max="1" min="0.6" step="0.05" type="number" />
+        </label>
+        <label class="toggle-control">
+          <input id="miniBarLockPositionInput" type="checkbox" />
+          <span data-i18n="settings.miniBarLockPosition">Lock posisi</span>
+        </label>
+        <label class="toggle-control">
+          <input id="miniBarShowSsidInput" type="checkbox" />
+          <span data-i18n="settings.miniBarShowSsid">Tampilkan SSID</span>
+        </label>
+        <label class="toggle-control">
+          <input id="miniBarShowTodayUsageInput" type="checkbox" />
+          <span data-i18n="settings.miniBarShowTodayUsage">Tampilkan Hari Ini</span>
+        </label>
+        <label class="toggle-control">
+          <input id="miniBarShowSessionUsageInput" type="checkbox" />
+          <span data-i18n="settings.miniBarShowSessionUsage">Tampilkan Sesi</span>
+        </label>
+        <label class="toggle-control">
+          <input id="miniBarShowTopAppInput" type="checkbox" />
+          <span data-i18n="settings.miniBarShowTopApp">Tampilkan Top App</span>
+        </label>
+        <label class="toggle-control">
+          <input id="miniBarShowStatusInput" type="checkbox" />
+          <span data-i18n="settings.miniBarShowStatus">Tampilkan Status</span>
+        </label>
+        <label class="toggle-control">
+          <input id="miniBarShowRefreshButtonInput" type="checkbox" />
+          <span data-i18n="settings.miniBarShowRefreshButton">Tampilkan tombol Refresh</span>
+        </label>
+        <label class="toggle-control">
+          <input id="miniBarShowOpenButtonInput" type="checkbox" />
+          <span data-i18n="settings.miniBarShowOpenButton">Tampilkan tombol Buka App</span>
+        </label>
+        <label class="toggle-control">
+          <input id="miniBarShowResetButtonInput" type="checkbox" />
+          <span data-i18n="settings.miniBarShowResetButton">Tampilkan tombol Reset</span>
+        </label>
+        <label class="toggle-control">
+          <input id="miniBarShowHideButtonInput" type="checkbox" />
+          <span data-i18n="settings.miniBarShowHideButton">Tampilkan tombol Hide</span>
+        </label>
+        <label class="toggle-control">
+          <input id="miniBarUseShortLabelsInput" type="checkbox" />
+          <span data-i18n="settings.miniBarUseShortLabels">Gunakan label pendek</span>
+        </label>
+        <div class="mini-bar-settings-actions">
+          <button class="secondary-button" data-i18n="button.openMiniBar" id="openMiniBarSettingsButton" type="button">Buka Mini Bar</button>
+          <button class="secondary-button" data-i18n="button.resetMiniBarAppearance" id="resetMiniBarSettingsButton" type="button">Reset Tampilan Mini Bar</button>
+        </div>
+        <p class="settings-group-title" data-i18n="settings.networkTarget">Target Jaringan</p>
         <label class="toggle-control">
           <input id="monitorOnlyListedInput" type="checkbox" />
           <span data-i18n="settings.monitorOnlyListedSsids">Monitor Hanya SSID Terdaftar</span>
@@ -474,13 +669,16 @@ app.innerHTML = `
       <p class="settings-note" data-i18n="settings.savedLocal" id="settingsNote">Pengaturan tersimpan lokal di profil Windows ini.</p>
     </section>
 
-    <section class="settings-panel">
+    <section class="settings-panel" data-page="settings">
       <div class="settings-header">
         <div>
           <p class="section-label" data-i18n="startup.appBehavior">Perilaku Aplikasi</p>
           <h3 data-i18n="startup.title">Startup</h3>
         </div>
-        <button class="refresh-button" data-i18n="button.saveStartupSettings" id="saveStartupButton" type="button">Simpan Pengaturan Startup</button>
+        <div class="startup-actions">
+          <button class="secondary-button" data-i18n="button.createDesktopShortcut" id="createShortcutButton" type="button">Buat Shortcut Desktop</button>
+          <button class="refresh-button" data-i18n="button.saveStartupSettings" id="saveStartupButton" type="button">Simpan Pengaturan Startup</button>
+        </div>
       </div>
       <div class="settings-grid startup-grid">
         <label class="toggle-control">
@@ -497,7 +695,7 @@ app.innerHTML = `
       </p>
     </section>
 
-    <section class="settings-panel">
+    <section class="settings-panel developer-only" data-page="developer">
       <div class="settings-header">
         <div>
           <p class="section-label" data-i18n="diagnostics.title">Diagnostik</p>
@@ -549,6 +747,7 @@ app.innerHTML = `
       </div>
       <p class="settings-note" data-i18n="diagnostics.notRefreshed" id="diagnosticsNote">Diagnostik belum disegarkan.</p>
     </section>
+    </main>
   </section>
 `;
 
@@ -563,6 +762,7 @@ const elements = {
   chartTotalSamples: document.querySelector('#chartTotalSamples'),
   clearChartButton: document.querySelector('#clearChartButton'),
   clearHistoryButton: document.querySelector('#clearHistoryButton'),
+  createShortcutButton: document.querySelector('#createShortcutButton'),
   downloadSession: document.querySelector('#downloadSession'),
   errorMessage: document.querySelector('#errorMessage'),
   estimateAverageSpeed: document.querySelector('#estimateAverageSpeed'),
@@ -570,8 +770,11 @@ const elements = {
   estimateDuration: document.querySelector('#estimateDuration'),
   estimatesList: document.querySelector('#estimatesList'),
   estimatesStatus: document.querySelector('#estimatesStatus'),
+  historyFilterSelect: document.querySelector('#historyFilterSelect'),
   historyList: document.querySelector('#historyList'),
   dailyLimitInput: document.querySelector('#dailyLimitInput'),
+  dashboardTopAppsList: document.querySelector('#dashboardTopAppsList'),
+  developerModeInput: document.querySelector('#developerModeInput'),
   diagnosticsAppVersion: document.querySelector('#diagnosticsAppVersion'),
   diagnosticsHistoryCount: document.querySelector('#diagnosticsHistoryCount'),
   diagnosticsHistoryPath: document.querySelector('#diagnosticsHistoryPath'),
@@ -592,8 +795,44 @@ const elements = {
   monitoringButton: document.querySelector('#monitoringButton'),
   monitoredSsidList: document.querySelector('#monitoredSsidList'),
   monitorOnlyListedInput: document.querySelector('#monitorOnlyListedInput'),
+  miniHideButton: document.querySelector('#miniHideButton'),
+  miniBarAlwaysOnTopInput: document.querySelector('#miniBarAlwaysOnTopInput'),
+  miniBarEnabledInput: document.querySelector('#miniBarEnabledInput'),
+  miniBarLayoutSelect: document.querySelector('#miniBarLayoutSelect'),
+  miniBarLockPositionInput: document.querySelector('#miniBarLockPositionInput'),
+  miniBarOpacityInput: document.querySelector('#miniBarOpacityInput'),
+  miniBarPositionSelect: document.querySelector('#miniBarPositionSelect'),
+  miniBarShowHideButtonInput: document.querySelector('#miniBarShowHideButtonInput'),
+  miniBarShowOpenButtonInput: document.querySelector('#miniBarShowOpenButtonInput'),
+  miniBarShowRefreshButtonInput: document.querySelector('#miniBarShowRefreshButtonInput'),
+  miniBarShowResetButtonInput: document.querySelector('#miniBarShowResetButtonInput'),
+  miniBarShowSessionUsageInput: document.querySelector('#miniBarShowSessionUsageInput'),
+  miniBarShowSsidInput: document.querySelector('#miniBarShowSsidInput'),
+  miniBarShowStatusInput: document.querySelector('#miniBarShowStatusInput'),
+  miniBarShowTodayUsageInput: document.querySelector('#miniBarShowTodayUsageInput'),
+  miniBarShowTopAppInput: document.querySelector('#miniBarShowTopAppInput'),
+  miniBarSizeSelect: document.querySelector('#miniBarSizeSelect'),
+  miniBarUseShortLabelsInput: document.querySelector('#miniBarUseShortLabelsInput'),
+  miniLimitStatus: document.querySelector('#miniLimitStatus'),
+  miniOpenMainButton: document.querySelector('#miniOpenMainButton'),
+  miniRefreshButton: document.querySelector('#miniRefreshButton'),
+  miniResetButton: document.querySelector('#miniResetButton'),
+  miniSessionGroup: document.querySelector('#miniSessionGroup'),
+  miniSessionLabel: document.querySelector('#miniSessionLabel'),
+  miniSessionUsage: document.querySelector('#miniSessionUsage'),
+  miniTodayGroup: document.querySelector('#miniTodayGroup'),
+  miniTodayLabel: document.querySelector('#miniTodayLabel'),
+  miniTodayUsage: document.querySelector('#miniTodayUsage'),
+  miniTopApp: document.querySelector('#miniTopApp'),
+  miniTopAppGroup: document.querySelector('#miniTopAppGroup'),
+  miniTopLabel: document.querySelector('#miniTopLabel'),
+  miniWifiSsid: document.querySelector('#miniWifiSsid'),
   networkTargetStatus: document.querySelector('#networkTargetStatus'),
+  navButtons: document.querySelectorAll('[data-page-target]'),
   notificationsEnabledInput: document.querySelector('#notificationsEnabledInput'),
+  openMiniBarButton: document.querySelector('#openMiniBarButton'),
+  openMiniBarSettingsButton: document.querySelector('#openMiniBarSettingsButton'),
+  pageSections: document.querySelectorAll('[data-page]'),
   primaryWifiSsid: document.querySelector('#primaryWifiSsid'),
   rawReceivedBytes: document.querySelector('#rawReceivedBytes'),
   rawSentBytes: document.querySelector('#rawSentBytes'),
@@ -602,6 +841,8 @@ const elements = {
   realPerAppUsageList: document.querySelector('#realPerAppUsageList'),
   realPerAppUsageNote: document.querySelector('#realPerAppUsageNote'),
   realPerAppParseStatus: document.querySelector('#realPerAppParseStatus'),
+  realPerAppPeriodActive: document.querySelector('#realPerAppPeriodActive'),
+  realPerAppPeriodSelect: document.querySelector('#realPerAppPeriodSelect'),
   realPerAppUsageReason: document.querySelector('#realPerAppUsageReason'),
   realPerAppUsageSource: document.querySelector('#realPerAppUsageSource'),
   realPerAppUsageStatus: document.querySelector('#realPerAppUsageStatus'),
@@ -611,6 +852,7 @@ const elements = {
   refreshRealPerAppUsageButton: document.querySelector('#refreshRealPerAppUsageButton'),
   refreshButton: document.querySelector('#refreshButton'),
   resetButton: document.querySelector('#resetButton'),
+  resetMiniBarSettingsButton: document.querySelector('#resetMiniBarSettingsButton'),
   refreshSuspectsButton: document.querySelector('#refreshSuspectsButton'),
   saveSettingsButton: document.querySelector('#saveSettingsButton'),
   saveStartupButton: document.querySelector('#saveStartupButton'),
@@ -649,13 +891,115 @@ let currentWifiInfo = null;
 let currentAppSuspects = null;
 let currentAppUsageEstimates = null;
 let currentRealPerAppUsage = null;
+let selectedRealPerAppPeriod = '7d';
+let selectedHistoryFilter = 'recent';
 let currentUsageSamples = [];
+let currentHistorySessions = [];
 let lastSsid = null;
 let isDiagnosticsLoading = false;
+let activePage = isMiniBarWindow ? 'dashboard' : 'dashboard';
 let currentStartupSettings = {
   launchAtStartup: false,
   startMinimizedToTray: false,
   isPackaged: false,
+};
+
+const isDeveloperModeEnabled = () => Boolean(currentSettings.developerMode);
+
+const setActivePage = (page) => {
+  const requestedPage = page || 'dashboard';
+  activePage = requestedPage === 'developer' && !isDeveloperModeEnabled()
+    ? 'dashboard'
+    : requestedPage;
+
+  document.body.dataset.page = activePage;
+  document.body.classList.toggle('developer-mode', isDeveloperModeEnabled());
+
+  elements.pageSections.forEach((section) => {
+    const pages = String(section.dataset.page || '').split(/\s+/).filter(Boolean);
+    const isDeveloperOnly = section.classList.contains('developer-only');
+    const shouldShow = pages.includes(activePage) && (!isDeveloperOnly || isDeveloperModeEnabled());
+
+    section.hidden = !shouldShow;
+  });
+
+  elements.navButtons.forEach((button) => {
+    const isDeveloperNav = button.classList.contains('developer-nav');
+
+    if (isDeveloperNav) {
+      button.hidden = !isDeveloperModeEnabled();
+    }
+
+    button.classList.toggle('active', button.dataset.pageTarget === activePage);
+  });
+};
+
+const refreshDeveloperModeUi = () => {
+  document.body.classList.toggle('developer-mode', isDeveloperModeEnabled());
+  setActivePage(activePage);
+  scheduleSuspectsRefresh();
+};
+
+const setElementVisible = (element, visible) => {
+  if (element) {
+    element.hidden = !visible;
+  }
+};
+
+const applyMiniBarUiSettings = () => {
+  const settings = currentSettings;
+  const layout = settings.miniBarLayout || 'standard';
+
+  document.body.dataset.miniSize = settings.miniBarSize || 'normal';
+  document.body.dataset.miniLayout = layout;
+  document.body.classList.toggle('mini-position-locked', Boolean(settings.miniBarLockPosition));
+
+  setElementVisible(
+    elements.miniWifiSsid,
+    settings.miniBarEnabled && settings.miniBarShowSsid && layout !== 'minimal',
+  );
+  setElementVisible(
+    elements.miniTodayGroup,
+    settings.miniBarEnabled && settings.miniBarShowTodayUsage,
+  );
+  setElementVisible(
+    elements.miniSessionGroup,
+    settings.miniBarEnabled && settings.miniBarShowSessionUsage,
+  );
+  setElementVisible(
+    elements.miniTopAppGroup,
+    settings.miniBarEnabled && settings.miniBarShowTopApp && layout === 'detailed',
+  );
+  setElementVisible(
+    elements.miniLimitStatus,
+    settings.miniBarEnabled && settings.miniBarShowStatus,
+  );
+  setElementVisible(
+    elements.miniRefreshButton,
+    settings.miniBarEnabled && settings.miniBarShowRefreshButton,
+  );
+  setElementVisible(
+    elements.miniOpenMainButton,
+    settings.miniBarEnabled && settings.miniBarShowOpenButton,
+  );
+  setElementVisible(
+    elements.miniResetButton,
+    settings.miniBarEnabled && settings.miniBarShowResetButton,
+  );
+  setElementVisible(
+    elements.miniHideButton,
+    settings.miniBarEnabled && settings.miniBarShowHideButton,
+  );
+
+  const useShortLabels = settings.miniBarUseShortLabels;
+
+  elements.miniTodayLabel.textContent = useShortLabels
+    ? t('mini.todayShort')
+    : t('metric.todayUsage');
+  elements.miniSessionLabel.textContent = useShortLabels
+    ? t('mini.sessionShort')
+    : t('metric.currentSession');
+  elements.miniTopLabel.textContent = useShortLabels ? t('mini.topShort') : t('mini.topApp');
 };
 
 const applyTranslations = (language = currentLanguage) => {
@@ -665,6 +1009,15 @@ const applyTranslations = (language = currentLanguage) => {
   document.querySelectorAll('[data-i18n]').forEach((element) => {
     element.textContent = t(element.dataset.i18n);
   });
+
+  document.querySelectorAll('[data-title-i18n]').forEach((element) => {
+    const label = t(element.dataset.titleI18n);
+
+    element.title = label;
+    element.setAttribute('aria-label', label);
+  });
+
+  applyMiniBarUiSettings();
 
   if (currentAppSuspects) {
     renderAppSuspects(currentAppSuspects);
@@ -677,6 +1030,8 @@ const applyTranslations = (language = currentLanguage) => {
   if (currentRealPerAppUsage) {
     renderRealPerAppUsage(currentRealPerAppUsage);
   }
+
+  renderTopAppsSummary(currentRealPerAppUsage);
 };
 
 const getStatusTranslationKey = (status) => {
@@ -742,7 +1097,7 @@ const scheduleAutoRefresh = () => {
 const scheduleSuspectsRefresh = () => {
   clearSuspectsTimer();
 
-  if (!monitoringEnabled || document.visibilityState !== 'visible') {
+  if (!monitoringEnabled || !isDeveloperModeEnabled() || document.visibilityState !== 'visible') {
     return;
   }
 
@@ -755,10 +1110,17 @@ const setLoading = (isLoading, action = 'refresh') => {
   elements.refreshButton.disabled = isLoading;
   elements.refreshEstimatesButton.disabled = isLoading || isEstimatesLoading;
   elements.refreshRealPerAppUsageButton.disabled = isLoading || isRealPerAppUsageLoading;
+  elements.realPerAppPeriodSelect.disabled = isLoading || isRealPerAppUsageLoading;
   elements.refreshSuspectsButton.disabled = isLoading || isSuspectsLoading;
   elements.resetButton.disabled = isResettingSession || (isLoading && action !== 'refresh');
+  elements.miniRefreshButton.disabled = isLoading;
+  elements.miniResetButton.disabled = isResettingSession || (isLoading && action !== 'refresh');
+  elements.openMiniBarButton.disabled = isLoading;
+  elements.openMiniBarSettingsButton.disabled = isLoading;
+  elements.resetMiniBarSettingsButton.disabled = isLoading;
   elements.clearChartButton.disabled = isLoading;
   elements.clearHistoryButton.disabled = isLoading;
+  elements.createShortcutButton.disabled = isLoading;
   elements.intervalSelect.disabled = isLoading;
   elements.saveSettingsButton.disabled = isLoading;
   elements.saveStartupButton.disabled = isLoading;
@@ -775,6 +1137,10 @@ const setLoading = (isLoading, action = 'refresh') => {
     isLoading && action === 'settings' ? t('button.saving') : t('button.saveSettings');
   elements.saveStartupButton.textContent =
     isLoading && action === 'startup' ? t('button.saving') : t('button.saveStartupSettings');
+  elements.createShortcutButton.textContent =
+    isLoading && action === 'shortcut'
+      ? t('button.creatingShortcut')
+      : t('button.createDesktopShortcut');
 };
 
 const setEstimatesLoading = (isLoading) => {
@@ -788,6 +1154,7 @@ const setEstimatesLoading = (isLoading) => {
 const setRealPerAppUsageLoading = (isLoading) => {
   isRealPerAppUsageLoading = isLoading;
   elements.refreshRealPerAppUsageButton.disabled = isLoading || isRefreshing;
+  elements.realPerAppPeriodSelect.disabled = isLoading || isRefreshing;
   elements.refreshRealPerAppUsageButton.textContent = isLoading
     ? t('button.refreshing')
     : t('button.refreshPerAppUsage');
@@ -825,10 +1192,12 @@ const renderMonitoredSsids = (ssids) => {
 
 const renderSettings = (settings) => {
   currentSettings = {
+    ...fallbackSettings,
     ...settings,
     language: normalizeLanguage(settings.language),
   };
   applyTranslations(currentSettings.language);
+  refreshDeveloperModeUi();
   updateMonitoringUi();
 
   if (document.activeElement !== elements.dailyLimitInput) {
@@ -855,6 +1224,79 @@ const renderSettings = (settings) => {
     elements.languageSelect.value = currentSettings.language;
   }
 
+  if (document.activeElement !== elements.developerModeInput) {
+    elements.developerModeInput.checked = currentSettings.developerMode;
+  }
+
+  if (document.activeElement !== elements.miniBarEnabledInput) {
+    elements.miniBarEnabledInput.checked = currentSettings.miniBarEnabled;
+  }
+
+  if (document.activeElement !== elements.miniBarAlwaysOnTopInput) {
+    elements.miniBarAlwaysOnTopInput.checked = currentSettings.miniBarAlwaysOnTop;
+  }
+
+  if (document.activeElement !== elements.miniBarSizeSelect) {
+    elements.miniBarSizeSelect.value = currentSettings.miniBarSize;
+  }
+
+  if (document.activeElement !== elements.miniBarLayoutSelect) {
+    elements.miniBarLayoutSelect.value = currentSettings.miniBarLayout;
+  }
+
+  if (document.activeElement !== elements.miniBarPositionSelect) {
+    elements.miniBarPositionSelect.value = currentSettings.miniBarPosition;
+  }
+
+  if (document.activeElement !== elements.miniBarOpacityInput) {
+    elements.miniBarOpacityInput.value = currentSettings.miniBarOpacity;
+  }
+
+  if (document.activeElement !== elements.miniBarLockPositionInput) {
+    elements.miniBarLockPositionInput.checked = currentSettings.miniBarLockPosition;
+  }
+
+  if (document.activeElement !== elements.miniBarShowSsidInput) {
+    elements.miniBarShowSsidInput.checked = currentSettings.miniBarShowSsid;
+  }
+
+  if (document.activeElement !== elements.miniBarShowTodayUsageInput) {
+    elements.miniBarShowTodayUsageInput.checked = currentSettings.miniBarShowTodayUsage;
+  }
+
+  if (document.activeElement !== elements.miniBarShowSessionUsageInput) {
+    elements.miniBarShowSessionUsageInput.checked = currentSettings.miniBarShowSessionUsage;
+  }
+
+  if (document.activeElement !== elements.miniBarShowTopAppInput) {
+    elements.miniBarShowTopAppInput.checked = currentSettings.miniBarShowTopApp;
+  }
+
+  if (document.activeElement !== elements.miniBarShowStatusInput) {
+    elements.miniBarShowStatusInput.checked = currentSettings.miniBarShowStatus;
+  }
+
+  if (document.activeElement !== elements.miniBarShowRefreshButtonInput) {
+    elements.miniBarShowRefreshButtonInput.checked = currentSettings.miniBarShowRefreshButton;
+  }
+
+  if (document.activeElement !== elements.miniBarShowOpenButtonInput) {
+    elements.miniBarShowOpenButtonInput.checked = currentSettings.miniBarShowOpenButton;
+  }
+
+  if (document.activeElement !== elements.miniBarShowResetButtonInput) {
+    elements.miniBarShowResetButtonInput.checked = currentSettings.miniBarShowResetButton;
+  }
+
+  if (document.activeElement !== elements.miniBarShowHideButtonInput) {
+    elements.miniBarShowHideButtonInput.checked = currentSettings.miniBarShowHideButton;
+  }
+
+  if (document.activeElement !== elements.miniBarUseShortLabelsInput) {
+    elements.miniBarUseShortLabelsInput.checked = currentSettings.miniBarUseShortLabels;
+  }
+
+  applyMiniBarUiSettings();
   renderMonitoredSsids(currentSettings.monitoredSsids);
 };
 
@@ -992,12 +1434,39 @@ const collectSettingsFromInputs = (overrides = {}) => ({
   monitoredSsids: currentSettings.monitoredSsids,
   monitorOnlyListedSsids: elements.monitorOnlyListedInput.checked,
   autoResetOnSsidChange: elements.autoResetOnSsidChangeInput.checked,
+  developerMode: elements.developerModeInput.checked,
+  miniBarEnabled: elements.miniBarEnabledInput.checked,
+  miniBarAlwaysOnTop: elements.miniBarAlwaysOnTopInput.checked,
+  miniBarOpacity: normalizeOpacityInput(elements.miniBarOpacityInput.value, currentSettings.miniBarOpacity),
+  miniBarSize: elements.miniBarSizeSelect.value,
+  miniBarLayout: elements.miniBarLayoutSelect.value,
+  miniBarPosition: elements.miniBarPositionSelect.value,
+  miniBarLockPosition: elements.miniBarLockPositionInput.checked,
+  miniBarShowSsid: elements.miniBarShowSsidInput.checked,
+  miniBarShowTodayUsage: elements.miniBarShowTodayUsageInput.checked,
+  miniBarShowSessionUsage: elements.miniBarShowSessionUsageInput.checked,
+  miniBarShowTopApp: elements.miniBarShowTopAppInput.checked,
+  miniBarShowStatus: elements.miniBarShowStatusInput.checked,
+  miniBarShowRefreshButton: elements.miniBarShowRefreshButtonInput.checked,
+  miniBarShowOpenButton: elements.miniBarShowOpenButtonInput.checked,
+  miniBarShowResetButton: elements.miniBarShowResetButtonInput.checked,
+  miniBarShowHideButton: elements.miniBarShowHideButtonInput.checked,
+  miniBarUseShortLabels: elements.miniBarUseShortLabelsInput.checked,
   language: normalizeLanguage(elements.languageSelect.value),
   ...overrides,
 });
 
-const renderHistory = (sessions) => {
-  const recentSessions = sessions.slice(0, 5);
+const renderHistory = (sessions = currentHistorySessions) => {
+  currentHistorySessions = Array.isArray(sessions) ? sessions : [];
+  const filteredSessions = currentHistorySessions.filter((session) => {
+    if (selectedHistoryFilter === 'today') {
+      return isSameLocalDay(session.startedAt || session.endedAt);
+    }
+
+    return true;
+  });
+  const recentSessions =
+    selectedHistoryFilter === 'all' ? filteredSessions : filteredSessions.slice(0, 5);
 
   if (recentSessions.length === 0) {
     elements.historyList.innerHTML = `<p class="history-empty">${escapeHtml(t('history.empty'))}</p>`;
@@ -1282,14 +1751,68 @@ const renderAppUsageEstimates = (estimatesData) => {
   });
 };
 
+const getRealPerAppPeriodLabel = (period) => {
+  const keyByPeriod = {
+    today: 'perApp.periodToday',
+    '7d': 'perApp.period7d',
+    '30d': 'perApp.period30d',
+    all: 'perApp.periodAll',
+  };
+
+  return t(keyByPeriod[period] || 'perApp.period7d');
+};
+
+const renderTopAppsSummary = (perAppUsage = currentRealPerAppUsage) => {
+  const apps = Array.isArray(perAppUsage?.apps) ? perAppUsage.apps.slice(0, 3) : [];
+
+  if (!apps.length) {
+    const emptyMessage = perAppUsage?.requiresAdministrator
+      ? t('perApp.requiresAdministrator')
+      : t('dashboard.topAppsEmpty');
+
+    elements.dashboardTopAppsList.innerHTML = `<p class="history-empty">${escapeHtml(
+      emptyMessage,
+    )}</p>`;
+    elements.miniTopApp.textContent = '-';
+    return;
+  }
+
+  elements.dashboardTopAppsList.innerHTML = apps
+    .map(
+      (appUsage, index) => `
+        <article class="top-app-row">
+          <span>${index + 1}</span>
+          <div>
+            <strong>${escapeHtml(appUsage.appName || appUsage.processName || 'Unknown')}</strong>
+            <small>${escapeHtml(appUsage.processName || t('label.notAvailable'))}</small>
+          </div>
+          <b>${escapeHtml(formatUsage(appUsage.totalBytes))}</b>
+        </article>
+      `,
+    )
+    .join('');
+
+  const topApp = apps[0];
+  elements.miniTopApp.textContent = `${topApp.appName || topApp.processName || 'Unknown'} ${formatUsage(
+    topApp.totalBytes,
+  )}`;
+};
+
 const renderRealPerAppUsage = (perAppUsage) => {
   currentRealPerAppUsage = perAppUsage;
   const apps = Array.isArray(perAppUsage?.apps) ? perAppUsage.apps : [];
   const supported = Boolean(perAppUsage?.supported);
   const source = perAppUsage?.sourceMethod || 'native-helper-placeholder';
+  const activePeriod = perAppUsage?.period || selectedRealPerAppPeriod;
+  const adminModeText = perAppUsage?.isAdministrator
+    ? t('perApp.adminMode')
+    : t('perApp.nonAdminMode');
   const reason =
     perAppUsage?.reason ||
     (!supported ? t('perApp.unsupportedMessage') : '');
+  const showInvestigationDetails = isDeveloperModeEnabled();
+
+  renderTopAppsSummary(perAppUsage);
 
   elements.realPerAppUsageStatus.textContent = supported
     ? t('perApp.supported')
@@ -1298,18 +1821,71 @@ const renderRealPerAppUsage = (perAppUsage) => {
   elements.realPerAppUsageSource.textContent = source;
   elements.realPerAppAccessStatus.textContent = perAppUsage?.accessStatus || '-';
   elements.realPerAppParseStatus.textContent = perAppUsage?.parseStatus || '-';
-  const unsupportedMessage =
-    perAppUsage?.accessStatus === 'access_denied' ||
-    perAppUsage?.discoveryStatus === 'access_denied'
+  elements.realPerAppPeriodActive.textContent = getRealPerAppPeriodLabel(activePeriod);
+  const unsupportedMessage = perAppUsage?.requiresAdministrator
+    ? `${t('perApp.adminRequiredMessage')} ${t('perApp.runAsAdminHint')} ${t(
+        'perApp.adminInstruction',
+      )}`
+    : perAppUsage?.accessStatus === 'access_denied' ||
+        perAppUsage?.discoveryStatus === 'access_denied'
       ? t('perApp.accessDeniedMessage')
       : `${t('perApp.unsupportedMessage')} ${reason ? `(${reason})` : ''}`;
 
   elements.realPerAppUsageReason.textContent = supported ? '' : unsupportedMessage;
   const investigationDetails = [
+    `${t('perApp.adminModeLabel')}: ${adminModeText}`,
+    perAppUsage?.requiresAdministrator ? t('perApp.requiresAdministrator') : '',
     perAppUsage?.dataType ? `${t('perApp.dataType')}: ${perAppUsage.dataType}` : '',
     perAppUsage?.note ? `${t('perApp.noteLabel')}: ${perAppUsage.note}` : '',
+    `${t('perApp.activePeriod')}: ${getRealPerAppPeriodLabel(activePeriod)}`,
+    perAppUsage?.periodStart
+      ? `${t('perApp.periodStart')}: ${formatDateTime(perAppUsage.periodStart)}`
+      : '',
+    perAppUsage?.periodEnd
+      ? `${t('perApp.periodEnd')}: ${formatDateTime(perAppUsage.periodEnd)}`
+      : '',
     perAppUsage?.discoveryStatus
       ? `${t('perApp.discoveryStatus')}: ${perAppUsage.discoveryStatus}`
+      : '',
+    perAppUsage?.managedEsentStatus
+      ? `${t('perApp.managedEsentStatus')}: ${perAppUsage.managedEsentStatus}`
+      : '',
+    perAppUsage?.eseApiStatus ? `${t('perApp.eseApiStatus')}: ${perAppUsage.eseApiStatus}` : '',
+    perAppUsage?.esentutlStatus
+      ? `${t('perApp.esentutlStatus')}: ${perAppUsage.esentutlStatus}`
+      : '',
+    perAppUsage?.catalogStatus
+      ? `${t('perApp.catalogStatus')}: ${perAppUsage.catalogStatus}`
+      : '',
+    perAppUsage?.tableEnumerationStatus
+      ? `${t('perApp.tableEnumerationStatus')}: ${perAppUsage.tableEnumerationStatus}`
+      : '',
+    perAppUsage?.copyStrategyUsed
+      ? `${t('perApp.copyStrategyUsed')}: ${perAppUsage.copyStrategyUsed}`
+      : '',
+    perAppUsage?.fileCopyStatus
+      ? `${t('perApp.fileCopyStatus')}: ${perAppUsage.fileCopyStatus}`
+      : '',
+    perAppUsage?.esentutlCopyStatus
+      ? `${t('perApp.esentutlCopyStatus')}: ${perAppUsage.esentutlCopyStatus}`
+      : '',
+    perAppUsage?.vssCopyStatus
+      ? `${t('perApp.vssCopyStatus')}: ${perAppUsage.vssCopyStatus}`
+      : '',
+    perAppUsage?.copyError ? `${t('perApp.copyError')}: ${perAppUsage.copyError}` : '',
+    perAppUsage?.recoveryStatus
+      ? `${t('perApp.recoveryStatus')}: ${perAppUsage.recoveryStatus}`
+      : '',
+    perAppUsage?.recoveryStrategyUsed
+      ? `${t('perApp.recoveryStrategyUsed')}: ${perAppUsage.recoveryStrategyUsed}`
+      : '',
+    Array.isArray(perAppUsage?.copiedSupportFiles) && perAppUsage.copiedSupportFiles.length
+      ? `${t('perApp.copiedSupportFiles')}: ${perAppUsage.copiedSupportFiles
+          .slice(0, 16)
+          .join(', ')}`
+      : '',
+    perAppUsage?.recoveryError
+      ? `${t('perApp.recoveryError')}: ${perAppUsage.recoveryError}`
       : '',
     perAppUsage?.srumPath ? `${t('perApp.srumPath')}: ${perAppUsage.srumPath}` : '',
     perAppUsage?.foundPath ? `${t('perApp.foundPath')}: ${perAppUsage.foundPath}` : '',
@@ -1320,10 +1896,28 @@ const renderRealPerAppUsage = (perAppUsage) => {
     Array.isArray(perAppUsage?.tableNames) && perAppUsage.tableNames.length
       ? `${t('perApp.tableNames')}: ${perAppUsage.tableNames.slice(0, 12).join(', ')}`
       : '',
+    Array.isArray(perAppUsage?.tableSchemas) && perAppUsage.tableSchemas.length
+      ? `${t('perApp.tableSchemas')}: ${perAppUsage.tableSchemas
+          .slice(0, 6)
+          .map((schema) => {
+            const columns = Array.isArray(schema.columns)
+              ? schema.columns
+                  .slice(0, 8)
+                  .map((column) => `${column.name}${column.type ? `:${column.type}` : ''}`)
+                  .join(', ')
+              : '';
+
+            return `${schema.tableName}${columns ? ` (${columns})` : ''}`;
+          })
+          .join(' | ')}`
+      : '',
     Array.isArray(perAppUsage?.networkTableCandidates) && perAppUsage.networkTableCandidates.length
       ? `${t('perApp.networkTableCandidates')}: ${perAppUsage.networkTableCandidates
           .slice(0, 12)
           .join(', ')}`
+      : '',
+    perAppUsage?.esentutlOutputPreview
+      ? `${t('perApp.esentutlOutputPreview')}: ${perAppUsage.esentutlOutputPreview}`
       : '',
   ].filter(Boolean);
 
@@ -1331,7 +1925,7 @@ const renderRealPerAppUsage = (perAppUsage) => {
     elements.realPerAppUsageList.innerHTML = `
       <p class="history-empty">${escapeHtml(t('perApp.empty'))}</p>
       ${
-        investigationDetails.length
+        showInvestigationDetails && investigationDetails.length
           ? `<div class="per-app-investigation">${investigationDetails
               .map((detail) => `<p>${escapeHtml(detail)}</p>`)
               .join('')}</div>`
@@ -1356,7 +1950,7 @@ const renderRealPerAppUsage = (perAppUsage) => {
 
   elements.realPerAppUsageList.innerHTML = `
     ${
-      investigationDetails.length
+      showInvestigationDetails && investigationDetails.length
         ? `<div class="per-app-investigation">${investigationDetails
             .map((detail) => `<p>${escapeHtml(detail)}</p>`)
             .join('')}</div>`
@@ -1366,17 +1960,27 @@ const renderRealPerAppUsage = (perAppUsage) => {
       .map((appUsage) => {
       const appName = appUsage.appName || appUsage.processName || 'Unknown';
       const processName = appUsage.processName || appName;
-      const packageName = appUsage.packageName ? ` / ${appUsage.packageName}` : '';
-      const identity = appUsage.rawIdentity ? ` / ${appUsage.rawIdentity}` : '';
-      const category = appUsage.category ? ` / ${appUsage.category}` : '';
+      const appId = Number.isFinite(appUsage.appId) && appUsage.appId > 0 ? `AppId ${appUsage.appId}` : '';
+      const packageName = appUsage.packageName || '';
+      const identity = appUsage.normalizedIdentity || appUsage.rawIdentity || '';
+      const category = appUsage.category || '';
       const method = appUsage.sourceMethod || source;
+      const detailText = [
+        processName,
+        identity && identity !== processName ? identity : '',
+        packageName,
+        appId,
+        category,
+      ]
+        .filter(Boolean)
+        .join(' / ');
 
       return `
         <article class="per-app-row">
           <div>
             <span>${escapeHtml(t('perApp.appName'))}</span>
             <strong>${escapeHtml(appName)}</strong>
-            <small>${escapeHtml(`${processName}${packageName}${identity}${category}`)}</small>
+            <small>${escapeHtml(detailText || processName)}</small>
           </div>
           <div>
             <span>${escapeHtml(t('perApp.download'))}</span>
@@ -1389,16 +1993,23 @@ const renderRealPerAppUsage = (perAppUsage) => {
           <div>
             <span>${escapeHtml(t('perApp.total'))}</span>
             <strong>${escapeHtml(formatUsage(appUsage.totalBytes))}</strong>
-            <small>${escapeHtml(appUsage.lastSeen || method)}</small>
+          </div>
+          <div>
+            <span>${escapeHtml(t('perApp.lastSeenLabel'))}</span>
+            <strong>${escapeHtml(appUsage.lastSeen ? formatDateTime(appUsage.lastSeen) : '-')}</strong>
+          </div>
+          <div>
+            <span>${escapeHtml(t('perApp.sourceLabel'))}</span>
+            <strong>${escapeHtml(method === 'srum-network-usage' ? t('perApp.srumHistorical') : method)}</strong>
           </div>
         </article>
       `;
       })
       .join('')}
   `;
-  elements.realPerAppUsageNote.textContent = tf('perApp.lastRefresh', {
+  elements.realPerAppUsageNote.textContent = `${tf('perApp.lastRefresh', {
     time: formatDateTime(perAppUsage.collectedAt),
-  });
+  })} · ${t('perApp.srumHistoricalNote')}`;
 };
 
 const renderAppSuspects = (suspectsData) => {
@@ -1627,6 +2238,9 @@ const renderDashboard = ({
   elements.adapterName.textContent = currentSsid || usage.adapterName;
   elements.todayUsage.textContent = combinedToday;
   elements.sessionUsage.textContent = sessionTotal;
+  elements.miniWifiSsid.textContent = currentSsid || t('status.notConnected');
+  elements.miniTodayUsage.textContent = combinedToday;
+  elements.miniSessionUsage.textContent = sessionTotal;
   elements.downloadSession.textContent = formatUsage(usage.sessionReceivedBytes);
   elements.uploadSession.textContent = formatUsage(usage.sessionSentBytes);
   elements.totalUsage.textContent = combinedToday;
@@ -1645,12 +2259,14 @@ const renderDashboard = ({
     elements.chartNote.textContent = toFriendlyError(usageSamplesError);
   }
 
-  renderLimitStatus({
+  const limitStatuses = renderLimitStatus({
     todayUsageBytes: combinedTodayBytes,
     sessionUsageBytes: usage.sessionTotalBytes,
     settings,
     isNetworkMonitored,
   });
+  elements.miniLimitStatus.textContent = t(getStatusTranslationKey(limitStatuses.overallStatus));
+  elements.miniLimitStatus.dataset.status = String(limitStatuses.overallStatus).toLowerCase();
 
   if (isNetworkMonitored) {
     requestLimitNotificationCheck({
@@ -1765,7 +2381,9 @@ const refreshRealPerAppUsage = async () => {
   setRealPerAppUsageLoading(true);
 
   try {
-    const result = await window.quotaLens.getRealPerAppUsage();
+    const result = await window.quotaLens.getRealPerAppUsage({
+      period: selectedRealPerAppPeriod,
+    });
 
     if (!result.ok) {
       throw new Error(result.error);
@@ -2144,6 +2762,116 @@ const saveStartupSettings = async () => {
   }
 };
 
+const createDesktopShortcut = async () => {
+  if (isRefreshing) {
+    return;
+  }
+
+  if (!ensureApi('createDesktopShortcut')) {
+    return;
+  }
+
+  isRefreshing = true;
+  setLoading(true, 'shortcut');
+  setStatus(t('status.creatingShortcut'), 'loading');
+
+  try {
+    const result = await window.quotaLens.createDesktopShortcut();
+
+    if (!result.ok) {
+      elements.startupNote.textContent =
+        result.isPackaged === false
+          ? t('startup.shortcutDevOnly')
+          : result.error || t('startup.shortcutFailed');
+      return;
+    }
+
+    elements.startupNote.textContent = result.shortcutPath
+      ? tf('startup.shortcutCreatedAt', { path: result.shortcutPath })
+      : t('startup.shortcutCreated');
+    setStatus(t('status.shortcutCreated'), 'ok');
+  } catch (error) {
+    renderError(error.message || t('startup.shortcutFailed'));
+    elements.startupNote.textContent = t('startup.shortcutFailed');
+  } finally {
+    isRefreshing = false;
+    setLoading(false);
+    updateMonitoringUi();
+  }
+};
+
+const openMiniBar = async () => {
+  if (!ensureApi('openMiniBar')) {
+    return;
+  }
+
+  try {
+    const result = await window.quotaLens.openMiniBar();
+
+    if (!result.ok) {
+      throw new Error(result.error);
+    }
+  } catch (error) {
+    renderError(error.message || t('mini.openFailed'));
+  }
+};
+
+const hideMiniBar = async () => {
+  if (!ensureApi('hideMiniBar')) {
+    return;
+  }
+
+  try {
+    await window.quotaLens.hideMiniBar();
+  } catch (error) {
+    renderError(error.message || t('mini.hideFailed'));
+  }
+};
+
+const resetMiniBarSettings = async () => {
+  if (isRefreshing) {
+    return;
+  }
+
+  if (!ensureApi('resetMiniBarSettings')) {
+    return;
+  }
+
+  isRefreshing = true;
+  setLoading(true, 'settings');
+  setStatus(t('status.savingSettings'), 'loading');
+
+  try {
+    const result = await window.quotaLens.resetMiniBarSettings();
+
+    if (!result.ok) {
+      throw new Error(result.error);
+    }
+
+    renderSettings(result.settings);
+    elements.settingsNote.textContent = t('settings.miniBarReset');
+  } catch (error) {
+    renderError(error.message || t('settings.miniBarResetFailed'));
+    elements.settingsNote.textContent = t('settings.miniBarResetFailed');
+  } finally {
+    isRefreshing = false;
+    setLoading(false);
+    updateMonitoringUi();
+  }
+};
+
+const showMainWindow = async () => {
+  if (!ensureApi('showMainWindow')) {
+    return;
+  }
+
+  try {
+    await window.quotaLens.showMainWindow();
+  } catch (error) {
+    renderError(error.message || t('mini.openMainFailed'));
+  }
+};
+
 const addCurrentSsidToMonitored = async () => {
   if (isRefreshing) {
     return;
@@ -2270,9 +2998,29 @@ const unsubscribeMonitoringCommand = window.quotaLens?.onMonitoringCommand?.((co
   }
 });
 
+elements.navButtons.forEach((button) => {
+  button.addEventListener('click', () => {
+    setActivePage(button.dataset.pageTarget);
+
+    if (activePage === 'developer') {
+      refreshDiagnostics();
+      refreshAppUsageEstimates();
+      refreshAppSuspects();
+    }
+
+    if (activePage === 'apps') {
+      refreshRealPerAppUsage();
+    }
+  });
+});
+
 elements.refreshButton.addEventListener('click', () => refreshUsage());
 elements.refreshEstimatesButton.addEventListener('click', () => refreshAppUsageEstimates());
 elements.refreshRealPerAppUsageButton.addEventListener('click', () => refreshRealPerAppUsage());
+elements.realPerAppPeriodSelect.addEventListener('change', (event) => {
+  selectedRealPerAppPeriod = event.target.value;
+  refreshRealPerAppUsage();
+});
 elements.refreshSuspectsButton.addEventListener('click', () => refreshAppSuspects());
 elements.resetButton.addEventListener('click', resetSession);
 elements.clearChartButton.addEventListener('click', clearChartData);
@@ -2282,6 +3030,14 @@ elements.openDataFolderButton.addEventListener('click', openDataFolder);
 elements.exportDiagnosticsButton.addEventListener('click', exportDiagnostics);
 elements.saveSettingsButton.addEventListener('click', saveSettings);
 elements.saveStartupButton.addEventListener('click', saveStartupSettings);
+elements.createShortcutButton.addEventListener('click', createDesktopShortcut);
+elements.openMiniBarButton.addEventListener('click', openMiniBar);
+elements.openMiniBarSettingsButton.addEventListener('click', openMiniBar);
+elements.resetMiniBarSettingsButton.addEventListener('click', resetMiniBarSettings);
+elements.miniRefreshButton.addEventListener('click', () => refreshUsage());
+elements.miniOpenMainButton.addEventListener('click', showMainWindow);
+elements.miniResetButton.addEventListener('click', resetSession);
+elements.miniHideButton.addEventListener('click', hideMiniBar);
 elements.addCurrentSsidButton.addEventListener('click', addCurrentSsidToMonitored);
 elements.monitoredSsidList.addEventListener('click', (event) => {
   const button = event.target.closest('button[data-ssid]');
@@ -2299,6 +3055,10 @@ elements.intervalSelect.addEventListener('change', (event) => {
     scheduleAutoRefresh();
   }
 });
+elements.historyFilterSelect.addEventListener('change', (event) => {
+  selectedHistoryFilter = event.target.value;
+  renderHistory();
+});
 elements.chartFilterSelect.addEventListener('change', () => {
   renderUsageChart(currentUsageSamples, normalizeSsid(currentWifiInfo?.ssid));
 });
@@ -2312,9 +3072,13 @@ window.addEventListener('beforeunload', () => {
 
 applyTranslations(currentLanguage);
 updateMonitoringUi();
+setActivePage('dashboard');
 refreshUsage().finally(() => {
-  refreshDiagnostics();
-  refreshAppUsageEstimates();
+  if (isDeveloperModeEnabled()) {
+    refreshDiagnostics();
+    refreshAppUsageEstimates();
+  }
+
   refreshRealPerAppUsage();
 });
 scheduleAutoRefresh();

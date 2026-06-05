@@ -94,6 +94,8 @@ out/
 # Native helper build output
 native/**/bin/
 native/**/obj/
+native/**/edb.chk
+native/**/edbres*.jrs
 
 # Local QuotaLens data / diagnostics
 quotalens-history.json
