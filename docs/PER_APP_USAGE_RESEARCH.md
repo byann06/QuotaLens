@@ -1005,6 +1005,45 @@ Setting yang tersedia:
 
 Jika Mini Bar digeser dan posisi tidak terkunci, QuotaLens menyimpan custom bounds agar posisi bisa dipertahankan. Ini hanya pengaturan UI; angka usage tetap berasal dari sumber yang sama seperti dashboard.
 
+## SRUM Temp Cache Cleanup
+
+Helper SRUM tidak membaca `C:\Windows\System32\sru\SRUDB.dat` langsung sebagai sumber kerja utama. Untuk menghindari masalah file locked dan Dirty Shutdown, helper membuat copy sementara ke:
+
+```text
+%TEMP%\QuotaLens\srum
+```
+
+Setiap run bisa membuat folder timestamp berisi `SRUDB.dat` dan file pendukung ESE seperti `.log`, `.jrs`, dan `.chk`. Ukurannya bisa puluhan MB per run. Jika folder lama tidak dibersihkan, cache ini dapat menumpuk dan menghabiskan storage.
+
+Cleanup otomatis sekarang dilakukan oleh helper SRUM:
+
+- saat helper mulai, folder run lama di `%TEMP%\QuotaLens\srum` dibersihkan
+- folder lebih lama dari 1 hari dihapus
+- helper menyisakan maksimal 3 folder run terbaru
+- jika total cache melebihi sekitar 500 MB, folder tertua dihapus lebih dulu
+- setelah helper selesai membaca copy SRUM, folder run aktif juga dicoba dihapus
+- jika ada file locked, helper tidak crash dan melaporkan warning di output JSON
+
+Cleanup hanya menyentuh:
+
+```text
+%TEMP%\QuotaLens\srum
+```
+
+Cleanup tidak pernah menghapus file asli Windows:
+
+```text
+C:\Windows\System32\sru\SRUDB.dat
+```
+
+Cleanup juga tidak menyentuh data aplikasi QuotaLens di AppData/Roaming atau folder `userData`.
+
+Jika QuotaLens sedang tertutup, aman untuk menghapus folder berikut secara manual jika ingin mengosongkan cache:
+
+```text
+%TEMP%\QuotaLens\srum
+```
+
 ## Rekomendasi Berikutnya
 
 1. Validasi angka SRUM dengan pembanding Windows Settings > Network & Internet > Data usage.

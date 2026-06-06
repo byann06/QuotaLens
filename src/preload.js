@@ -22,6 +22,8 @@ contextBridge.exposeInMainWorld('quotaLens', {
   hideMiniBar: () => ipcRenderer.invoke('quotalens:hide-mini-bar'),
   updateMiniBarSettings: (settings) =>
     ipcRenderer.invoke('quotalens:update-mini-bar-settings', settings),
+  applyMiniBarSettings: (settings) =>
+    ipcRenderer.invoke('quotalens:apply-mini-bar-settings', settings),
   resetMiniBarSettings: () => ipcRenderer.invoke('quotalens:reset-mini-bar-settings'),
   setMiniBarPosition: (position) => ipcRenderer.invoke('quotalens:set-mini-bar-position', position),
   showMainWindow: () => ipcRenderer.invoke('quotalens:show-main-window'),
@@ -44,6 +46,19 @@ contextBridge.exposeInMainWorld('quotaLens', {
 
     return () => {
       ipcRenderer.removeListener('quotalens:monitoring-command', handler);
+    };
+  },
+  onSettingsUpdated: (callback) => {
+    if (typeof callback !== 'function') {
+      return () => {};
+    }
+
+    const handler = (_event, settings) => callback(settings);
+
+    ipcRenderer.on('quotalens:settings-updated', handler);
+
+    return () => {
+      ipcRenderer.removeListener('quotalens:settings-updated', handler);
     };
   },
 });

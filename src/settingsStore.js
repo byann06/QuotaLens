@@ -22,6 +22,17 @@ export const miniBarDefaultSettings = {
   miniBarShowResetButton: false,
   miniBarShowHideButton: true,
   miniBarUseShortLabels: true,
+  miniBarBgColor: '#081020',
+  miniBarBorderColor: '#1f3b5f',
+  miniBarTextColor: '#ffffff',
+  miniBarMutedTextColor: '#a9c4e8',
+  miniBarAccentColor: '#22c7b8',
+  miniBarButtonBgColor: '#101a2f',
+  miniBarButtonTextColor: '#ffffff',
+  miniBarDangerColor: '#ff6b6b',
+  miniBarSafeColor: '#4ade80',
+  miniBarWarningColor: '#facc15',
+  miniBarExceededColor: '#fb7185',
   miniBarCustomBounds: null,
 };
 
@@ -83,6 +94,39 @@ const normalizeNumberInRange = (value, fallback, min, max) => {
   }
 
   return Math.min(max, Math.max(min, numericValue));
+};
+
+const normalizeOpacitySetting = (value, fallback) => {
+  const numericValue = Number(value);
+
+  if (!Number.isFinite(numericValue)) {
+    return fallback;
+  }
+
+  if (numericValue > 1) {
+    return normalizeNumberInRange(numericValue / 100, fallback, 0, 1);
+  }
+
+  return normalizeNumberInRange(numericValue, fallback, 0, 1);
+};
+
+const normalizeHexColor = (value, fallback) => {
+  const rawValue = String(value || '').trim().toLowerCase();
+  const color = rawValue.startsWith('#') ? rawValue : `#${rawValue}`;
+
+  if (/^#[0-9a-f]{3}$/.test(color)) {
+    return `#${color
+      .slice(1)
+      .split('')
+      .map((character) => `${character}${character}`)
+      .join('')}`;
+  }
+
+  if (/^#[0-9a-f]{6}$/.test(color)) {
+    return color;
+  }
+
+  return fallback;
 };
 
 const normalizeChoice = (value, allowedValues, fallback) => {
@@ -156,12 +200,7 @@ const normalizeSettings = (settings = {}) => ({
       : typeof settings.alwaysOnTopMiniBar === 'boolean'
         ? settings.alwaysOnTopMiniBar
         : defaultSettings.miniBarAlwaysOnTop,
-  miniBarOpacity: normalizeNumberInRange(
-    settings.miniBarOpacity,
-    defaultSettings.miniBarOpacity,
-    0.6,
-    1,
-  ),
+  miniBarOpacity: normalizeOpacitySetting(settings.miniBarOpacity, defaultSettings.miniBarOpacity),
   miniBarSize: normalizeChoice(settings.miniBarSize, ['compact', 'normal', 'wide'], 'normal'),
   miniBarLayout: normalizeChoice(
     settings.miniBarLayout,
@@ -217,6 +256,41 @@ const normalizeSettings = (settings = {}) => ({
     typeof settings.miniBarUseShortLabels === 'boolean'
       ? settings.miniBarUseShortLabels
       : defaultSettings.miniBarUseShortLabels,
+  miniBarBgColor: normalizeHexColor(settings.miniBarBgColor, defaultSettings.miniBarBgColor),
+  miniBarBorderColor: normalizeHexColor(
+    settings.miniBarBorderColor,
+    defaultSettings.miniBarBorderColor,
+  ),
+  miniBarTextColor: normalizeHexColor(settings.miniBarTextColor, defaultSettings.miniBarTextColor),
+  miniBarMutedTextColor: normalizeHexColor(
+    settings.miniBarMutedTextColor,
+    defaultSettings.miniBarMutedTextColor,
+  ),
+  miniBarAccentColor: normalizeHexColor(
+    settings.miniBarAccentColor,
+    defaultSettings.miniBarAccentColor,
+  ),
+  miniBarButtonBgColor: normalizeHexColor(
+    settings.miniBarButtonBgColor,
+    defaultSettings.miniBarButtonBgColor,
+  ),
+  miniBarButtonTextColor: normalizeHexColor(
+    settings.miniBarButtonTextColor,
+    defaultSettings.miniBarButtonTextColor,
+  ),
+  miniBarDangerColor: normalizeHexColor(
+    settings.miniBarDangerColor,
+    defaultSettings.miniBarDangerColor,
+  ),
+  miniBarSafeColor: normalizeHexColor(settings.miniBarSafeColor, defaultSettings.miniBarSafeColor),
+  miniBarWarningColor: normalizeHexColor(
+    settings.miniBarWarningColor,
+    defaultSettings.miniBarWarningColor,
+  ),
+  miniBarExceededColor: normalizeHexColor(
+    settings.miniBarExceededColor,
+    defaultSettings.miniBarExceededColor,
+  ),
   miniBarCustomBounds: normalizeMiniBarCustomBounds(settings.miniBarCustomBounds),
   language: normalizeLanguage(settings.language),
 });

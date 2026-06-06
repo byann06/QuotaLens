@@ -177,13 +177,21 @@ const applyMiniBarSettings = (settings) => {
   setTimeout(() => {
     isApplyingMiniBarBounds = false;
   }, 100);
-  miniBarWindow.setOpacity(Number(settings.miniBarOpacity) || 0.95);
   miniBarWindow.setAlwaysOnTop(Boolean(settings.miniBarAlwaysOnTop), 'floating');
 
   if (typeof miniBarWindow.setMovable === 'function') {
     miniBarWindow.setMovable(!settings.miniBarLockPosition);
   }
 };
+
+const shouldApplyMiniBarWindowSettings = (previousSettings, nextSettings) =>
+  [
+    'miniBarEnabled',
+    'miniBarAlwaysOnTop',
+    'miniBarSize',
+    'miniBarPosition',
+    'miniBarLockPosition',
+  ].some((key) => previousSettings?.[key] !== nextSettings?.[key]);
 
 const showMiniBarWindow = async () => {
   const settings = await readSettings();
@@ -206,9 +214,9 @@ const showMiniBarWindow = async () => {
       maxHeight: miniBarSizeByName.wide.height,
       show: false,
       title: 'QuotaLens Mini Bar',
-      backgroundColor: '#0f172a',
+      backgroundColor: '#00000000',
       frame: false,
-      transparent: false,
+      transparent: true,
       alwaysOnTop: settings.miniBarAlwaysOnTop,
       skipTaskbar: true,
       resizable: false,
@@ -333,6 +341,16 @@ const sendMonitoringCommand = (command) => {
 
   if (miniBarWindow && !miniBarWindow.isDestroyed()) {
     miniBarWindow.webContents.send('quotalens:monitoring-command', command);
+  }
+};
+
+const sendSettingsUpdated = (settings) => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('quotalens:settings-updated', settings);
+  }
+
+  if (miniBarWindow && !miniBarWindow.isDestroyed()) {
+    miniBarWindow.webContents.send('quotalens:settings-updated', settings);
   }
 };
 
@@ -654,6 +672,7 @@ app.whenReady().then(async () => {
       const savedSettings = await updateSettings(settings);
       refreshTrayMenu(savedSettings.language);
       applyMiniBarSettings(savedSettings);
+      sendSettingsUpdated(savedSettings);
       return { ok: true, settings: savedSettings };
     } catch (error) {
       return {
@@ -925,6 +944,7 @@ app.whenReady().then(async () => {
       const settings = await updateSettings(miniBarSettings);
 
       applyMiniBarSettings(settings);
+      sendSettingsUpdated(settings);
 
       return { ok: true, settings };
     } catch (error) {
@@ -935,11 +955,35 @@ app.whenReady().then(async () => {
     }
   });
 
+  ipcMain.handle('quotalens:apply-mini-bar-settings', async (_event, miniBarSettings) => {
+    try {
+      const previousSettings = await readSettings();
+      const settings = {
+        ...previousSettings,
+        ...miniBarSettings,
+      };
+
+      if (shouldApplyMiniBarWindowSettings(previousSettings, settings)) {
+        applyMiniBarSettings(settings);
+      }
+
+      sendSettingsUpdated(settings);
+
+      return { ok: true, settings };
+    } catch (error) {
+      return {
+        ok: false,
+        error: error.message || 'Failed to apply Mini Bar settings.',
+      };
+    }
+  });
+
   ipcMain.handle('quotalens:reset-mini-bar-settings', async () => {
     try {
       const settings = await updateSettings(miniBarDefaultSettings);
 
       applyMiniBarSettings(settings);
+      sendSettingsUpdated(settings);
 
       return { ok: true, settings };
     } catch (error) {
@@ -957,6 +1001,7 @@ app.whenReady().then(async () => {
       });
 
       applyMiniBarSettings(settings);
+      sendSettingsUpdated(settings);
 
       return { ok: true, settings };
     } catch (error) {

@@ -33,8 +33,51 @@ const fallbackSettings = {
   miniBarShowResetButton: false,
   miniBarShowHideButton: true,
   miniBarUseShortLabels: true,
+  miniBarBgColor: '#081020',
+  miniBarBorderColor: '#1f3b5f',
+  miniBarTextColor: '#ffffff',
+  miniBarMutedTextColor: '#a9c4e8',
+  miniBarAccentColor: '#22c7b8',
+  miniBarButtonBgColor: '#101a2f',
+  miniBarButtonTextColor: '#ffffff',
+  miniBarDangerColor: '#ff6b6b',
+  miniBarSafeColor: '#4ade80',
+  miniBarWarningColor: '#facc15',
+  miniBarExceededColor: '#fb7185',
   language: 'id',
 };
+
+const miniBarColorFields = [
+  ['miniBarBgColor', 'miniBar.colorBackground'],
+  ['miniBarBorderColor', 'miniBar.colorBorder'],
+  ['miniBarTextColor', 'miniBar.colorText'],
+  ['miniBarMutedTextColor', 'miniBar.colorMutedText'],
+  ['miniBarAccentColor', 'miniBar.colorAccent'],
+  ['miniBarButtonBgColor', 'miniBar.colorButtonBg'],
+  ['miniBarButtonTextColor', 'miniBar.colorButtonText'],
+  ['miniBarDangerColor', 'miniBar.colorDanger'],
+  ['miniBarSafeColor', 'miniBar.colorSafe'],
+  ['miniBarWarningColor', 'miniBar.colorWarning'],
+  ['miniBarExceededColor', 'miniBar.colorExceeded'],
+];
+
+const miniBarColorCssVars = {
+  miniBarBgColor: '--mini-bar-bg-color',
+  miniBarBorderColor: '--mini-bar-border-color',
+  miniBarTextColor: '--mini-bar-text-color',
+  miniBarMutedTextColor: '--mini-bar-muted-text-color',
+  miniBarAccentColor: '--mini-bar-accent-color',
+  miniBarButtonBgColor: '--mini-bar-button-bg-color',
+  miniBarButtonTextColor: '--mini-bar-button-text-color',
+  miniBarDangerColor: '--mini-bar-danger-color',
+  miniBarSafeColor: '--mini-bar-safe-color',
+  miniBarWarningColor: '--mini-bar-warning-color',
+  miniBarExceededColor: '--mini-bar-exceeded-color',
+};
+
+const miniBarDefaultColorSettings = Object.fromEntries(
+  miniBarColorFields.map(([key]) => [key, fallbackSettings[key]]),
+);
 
 let currentLanguage = fallbackSettings.language;
 const isMiniBarWindow = new URLSearchParams(window.location.search).get('mode') === 'mini';
@@ -117,8 +160,48 @@ const normalizeOpacityInput = (value, fallback = fallbackSettings.miniBarOpacity
     return fallback;
   }
 
-  return Math.min(1, Math.max(0.6, numericValue));
+  if (numericValue > 1) {
+    return Math.min(1, Math.max(0, Math.round(numericValue) / 100));
+  }
+
+  return Math.min(1, Math.max(0, numericValue));
 };
+
+const opacityToSliderValue = (value) => Math.round(normalizeOpacityInput(value) * 100);
+
+const normalizeHexColorInput = (value, fallback = null) => {
+  const rawValue = String(value || '').trim().toLowerCase();
+  const color = rawValue.startsWith('#') ? rawValue : `#${rawValue}`;
+
+  if (/^#[0-9a-f]{3}$/.test(color)) {
+    return `#${color
+      .slice(1)
+      .split('')
+      .map((character) => `${character}${character}`)
+      .join('')}`;
+  }
+
+  if (/^#[0-9a-f]{6}$/.test(color)) {
+    return color;
+  }
+
+  return fallback;
+};
+
+const hexToRgbParts = (hexColor) => {
+  const color = normalizeHexColorInput(hexColor, '#081020').slice(1);
+  const channels = color.match(/.{2}/g) || ['08', '10', '20'];
+
+  return channels.map((channel) => Number.parseInt(channel, 16)).join(', ');
+};
+
+const getMiniBarColorSettings = (settings = currentSettings) =>
+  Object.fromEntries(
+    miniBarColorFields.map(([key]) => [
+      key,
+      normalizeHexColorInput(settings[key], fallbackSettings[key]),
+    ]),
+  );
 
 const getLimitStatus = (usageBytes, limitBytes) => {
   if (!Number.isFinite(limitBytes) || limitBytes <= 0) {
@@ -206,21 +289,22 @@ const escapeHtml = (value) =>
     .replaceAll('"', '&quot;')
     .replaceAll("'", '&#039;');
 
+document.documentElement.classList.toggle('mini-mode', isMiniBarWindow);
 document.body.classList.toggle('mini-mode', isMiniBarWindow);
 
 app.innerHTML = `
   <section class="shell">
     <section class="mini-bar-panel" aria-live="polite">
       <div class="mini-drag-strip">
-        <strong class="mini-brand">QuotaLens</strong>
-        <span class="mini-dot">·</span>
+        <strong class="mini-brand" id="miniBrand">QuotaLens</strong>
+        <span class="mini-dot" id="miniDot">·</span>
         <span class="mini-ssid" id="miniWifiSsid">Mendeteksi...</span>
         <span class="mini-metric" id="miniTodayGroup"><b data-i18n="mini.todayShort" id="miniTodayLabel">Hari ini</b> <strong id="miniTodayUsage">-</strong></span>
         <span class="mini-metric" id="miniSessionGroup"><b data-i18n="mini.sessionShort" id="miniSessionLabel">Sesi</b> <strong id="miniSessionUsage">-</strong></span>
         <span class="mini-metric mini-top-app" id="miniTopAppGroup"><b data-i18n="mini.topShort" id="miniTopLabel">Top</b> <strong id="miniTopApp">-</strong></span>
         <span class="mini-status" id="miniLimitStatus">-</span>
       </div>
-      <div class="mini-actions">
+      <div class="mini-actions" id="miniActions">
         <button class="mini-icon-button" data-title-i18n="button.refreshStats" id="miniRefreshButton" type="button">⟳</button>
         <button class="mini-icon-button" data-title-i18n="button.openMainApp" id="miniOpenMainButton" type="button">↗</button>
         <button class="mini-icon-button" data-title-i18n="button.resetSession" id="miniResetButton" type="button">↺</button>
@@ -236,6 +320,7 @@ app.innerHTML = `
       <button class="nav-button active" data-page-target="dashboard" data-i18n="nav.dashboard" type="button">Beranda</button>
       <button class="nav-button" data-page-target="apps" data-i18n="nav.apps" type="button">Pemakaian Aplikasi</button>
       <button class="nav-button" data-page-target="history" data-i18n="nav.history" type="button">Riwayat</button>
+      <button class="nav-button" data-page-target="miniBar" data-i18n="nav.miniBar" type="button">Mini Bar</button>
       <button class="nav-button" data-page-target="settings" data-i18n="nav.settings" type="button">Pengaturan</button>
       <button class="nav-button developer-nav" data-page-target="developer" data-i18n="nav.developer" type="button">Developer</button>
     </nav>
@@ -295,7 +380,7 @@ app.innerHTML = `
       </div>
     </section>
 
-    <p class="error-message" id="errorMessage" role="alert" data-page="dashboard apps history settings developer"></p>
+    <p class="error-message" id="errorMessage" role="alert" data-page="dashboard apps history miniBar settings developer"></p>
 
     <section class="stats-grid" aria-live="polite" data-page="dashboard">
       <article class="stat-card">
@@ -526,6 +611,177 @@ app.innerHTML = `
       </div>
     </section>
 
+    <section class="mini-bar-config-panel" data-page="miniBar">
+      <div class="settings-header">
+        <div>
+          <p class="section-label" data-i18n="miniBar.pageLabel">Mini Bar</p>
+          <h3 data-i18n="miniBar.pageTitle">Personalisasi Mini Bar</h3>
+        </div>
+        <div class="mini-bar-settings-actions">
+          <button class="secondary-button" data-i18n="button.openMiniBar" id="openMiniBarSettingsButton" type="button">Buka Mini Bar</button>
+          <button class="secondary-button" data-i18n="button.hideMiniBar" id="hideMiniBarSettingsButton" type="button">Sembunyikan</button>
+          <button class="secondary-button" data-i18n="button.resetMiniBarColors" id="resetMiniBarColorsButton" type="button">Reset Warna Mini Bar</button>
+          <button class="refresh-button" data-i18n="button.resetMiniBarAppearance" id="resetMiniBarSettingsButton" type="button">Reset Tampilan Mini Bar</button>
+        </div>
+      </div>
+
+      <div class="mini-bar-status-grid">
+        <div>
+          <span data-i18n="miniBar.status">Status Mini Bar</span>
+          <strong id="miniBarStatusText">-</strong>
+        </div>
+        <div>
+          <span data-i18n="miniBar.currentPosition">Posisi saat ini</span>
+          <strong id="miniBarPositionStatus">-</strong>
+        </div>
+        <div>
+          <span data-i18n="miniBar.currentLayout">Layout saat ini</span>
+          <strong id="miniBarLayoutStatus">-</strong>
+        </div>
+        <div>
+          <span data-i18n="miniBar.currentSize">Ukuran saat ini</span>
+          <strong id="miniBarSizeStatus">-</strong>
+        </div>
+      </div>
+
+      <div class="mini-bar-config-grid">
+        <article class="mini-settings-card">
+          <p class="settings-group-title" data-i18n="miniBar.sectionStatus">Status Mini Bar</p>
+          <label class="toggle-control">
+            <input id="miniBarEnabledInput" type="checkbox" />
+            <span data-i18n="settings.miniBarEnabled">Aktif</span>
+          </label>
+          <label class="toggle-control">
+            <input id="miniBarAlwaysOnTopInput" type="checkbox" />
+            <span data-i18n="settings.miniBarAlwaysOnTop">Selalu di atas</span>
+          </label>
+        </article>
+
+        <article class="mini-settings-card">
+          <p class="settings-group-title" data-i18n="miniBar.sectionAppearance">Tampilan</p>
+          <label>
+            <span data-i18n="settings.miniBarSize">Ukuran</span>
+            <select id="miniBarSizeSelect">
+              <option data-i18n="settings.miniBarSizeCompact" value="compact">Compact</option>
+              <option data-i18n="settings.miniBarSizeNormal" value="normal">Normal</option>
+              <option data-i18n="settings.miniBarSizeWide" value="wide">Wide</option>
+            </select>
+          </label>
+          <label>
+            <span data-i18n="settings.miniBarLayout">Layout</span>
+            <select id="miniBarLayoutSelect">
+              <option data-i18n="settings.miniBarLayoutMinimal" value="minimal">Minimal</option>
+              <option data-i18n="settings.miniBarLayoutStandard" value="standard">Standard</option>
+              <option data-i18n="settings.miniBarLayoutDetailed" value="detailed">Detailed</option>
+            </select>
+          </label>
+          <label class="range-control">
+            <span id="miniBarOpacityLabel">Opacity Background Mini Bar: 95%</span>
+            <div class="range-row">
+              <input id="miniBarOpacityInput" max="100" min="0" step="1" type="range" value="95" />
+              <strong class="range-value" id="miniBarOpacityValue">95%</strong>
+            </div>
+            <small data-i18n="settings.miniBarOpacityHelp">Transparansi latar Mini Bar</small>
+          </label>
+          <p class="settings-note compact-note" data-i18n="miniBar.gamingTip">Gunakan mode compact + minimal untuk gaming.</p>
+        </article>
+
+        <article class="mini-settings-card">
+          <p class="settings-group-title" data-i18n="miniBar.sectionData">Data yang Ditampilkan</p>
+          <label class="toggle-control">
+            <input id="miniBarShowSsidInput" type="checkbox" />
+            <span data-i18n="settings.miniBarShowSsid">Tampilkan SSID</span>
+          </label>
+          <label class="toggle-control">
+            <input id="miniBarShowTodayUsageInput" type="checkbox" />
+            <span data-i18n="settings.miniBarShowTodayUsage">Tampilkan Hari Ini</span>
+          </label>
+          <label class="toggle-control">
+            <input id="miniBarShowSessionUsageInput" type="checkbox" />
+            <span data-i18n="settings.miniBarShowSessionUsage">Tampilkan Sesi</span>
+          </label>
+          <label class="toggle-control">
+            <input id="miniBarShowTopAppInput" type="checkbox" />
+            <span data-i18n="settings.miniBarShowTopApp">Tampilkan Top App</span>
+          </label>
+          <label class="toggle-control">
+            <input id="miniBarShowStatusInput" type="checkbox" />
+            <span data-i18n="settings.miniBarShowStatus">Tampilkan Status</span>
+          </label>
+        </article>
+
+        <article class="mini-settings-card">
+          <p class="settings-group-title" data-i18n="miniBar.sectionButtons">Tombol yang Ditampilkan</p>
+          <label class="toggle-control">
+            <input id="miniBarShowRefreshButtonInput" type="checkbox" />
+            <span data-i18n="settings.miniBarShowRefreshButton">Tombol Refresh</span>
+          </label>
+          <label class="toggle-control">
+            <input id="miniBarShowOpenButtonInput" type="checkbox" />
+            <span data-i18n="settings.miniBarShowOpenButton">Tombol Buka App</span>
+          </label>
+          <label class="toggle-control">
+            <input id="miniBarShowResetButtonInput" type="checkbox" />
+            <span data-i18n="settings.miniBarShowResetButton">Tombol Reset</span>
+          </label>
+          <label class="toggle-control">
+            <input id="miniBarShowHideButtonInput" type="checkbox" />
+            <span data-i18n="settings.miniBarShowHideButton">Tombol Hide</span>
+          </label>
+        </article>
+
+        <article class="mini-settings-card">
+          <p class="settings-group-title" data-i18n="miniBar.sectionBehavior">Posisi dan Perilaku</p>
+          <label>
+            <span data-i18n="settings.miniBarPosition">Posisi</span>
+            <select id="miniBarPositionSelect">
+              <option data-i18n="settings.positionTopLeft" value="top-left">Kiri atas</option>
+              <option data-i18n="settings.positionTopRight" value="top-right">Kanan atas</option>
+              <option data-i18n="settings.positionBottomLeft" value="bottom-left">Kiri bawah</option>
+              <option data-i18n="settings.positionBottomRight" value="bottom-right">Kanan bawah</option>
+              <option data-i18n="settings.positionCustom" value="custom">Custom</option>
+            </select>
+          </label>
+          <label class="toggle-control">
+            <input id="miniBarLockPositionInput" type="checkbox" />
+            <span data-i18n="settings.miniBarLockPosition">Lock posisi</span>
+          </label>
+          <label class="toggle-control">
+            <input id="miniBarUseShortLabelsInput" type="checkbox" />
+            <span data-i18n="settings.miniBarUseShortLabels">Gunakan label pendek</span>
+          </label>
+        </article>
+
+        <article class="mini-settings-card mini-colors-card">
+          <p class="settings-group-title" data-i18n="miniBar.sectionColors">Warna Mini Bar</p>
+          <div class="mini-color-grid">
+            ${miniBarColorFields
+              .map(
+                ([key, labelKey]) => `
+                  <label class="mini-color-control">
+                    <span data-i18n="${labelKey}">${labelKey}</span>
+                    <input data-mini-color-picker="${key}" type="color" value="${fallbackSettings[key]}" />
+                    <input data-mini-color-text="${key}" spellcheck="false" type="text" value="${fallbackSettings[key]}" />
+                  </label>
+                `,
+              )
+              .join('')}
+          </div>
+          <small class="color-error" data-i18n="miniBar.invalidColor" id="miniBarColorError" hidden>Format warna tidak valid.</small>
+          <small class="compact-note" data-i18n="miniBar.colorAutoSaveNote">Perubahan warna tersimpan otomatis.</small>
+        </article>
+
+        <article class="mini-settings-card mini-preview-card">
+          <p class="settings-group-title" data-i18n="miniBar.sectionPreview">Preview</p>
+          <div class="mini-preview-stage">
+            <div class="mini-preview-bar" id="miniBarPreview"></div>
+          </div>
+        </article>
+      </div>
+
+      <p class="settings-note" data-i18n="miniBar.autoSaveNote" id="miniBarAutoSaveNote">Perubahan Mini Bar tersimpan otomatis.</p>
+    </section>
+
     <section class="settings-panel" data-page="settings">
       <div class="settings-header">
         <div>
@@ -560,93 +816,6 @@ app.innerHTML = `
           <input id="developerModeInput" type="checkbox" />
           <span data-i18n="settings.developerMode">Developer Mode</span>
         </label>
-        <p class="settings-group-title" data-i18n="settings.miniBar">Mini Bar</p>
-        <label class="toggle-control">
-          <input id="miniBarEnabledInput" type="checkbox" />
-          <span data-i18n="settings.miniBarEnabled">Aktifkan Mini Bar</span>
-        </label>
-        <label class="toggle-control">
-          <input id="miniBarAlwaysOnTopInput" type="checkbox" />
-          <span data-i18n="settings.miniBarAlwaysOnTop">Selalu di atas</span>
-        </label>
-        <label>
-          <span data-i18n="settings.miniBarSize">Ukuran</span>
-          <select id="miniBarSizeSelect">
-            <option data-i18n="settings.miniBarSizeCompact" value="compact">Compact</option>
-            <option data-i18n="settings.miniBarSizeNormal" value="normal">Normal</option>
-            <option data-i18n="settings.miniBarSizeWide" value="wide">Wide</option>
-          </select>
-        </label>
-        <label>
-          <span data-i18n="settings.miniBarLayout">Layout</span>
-          <select id="miniBarLayoutSelect">
-            <option data-i18n="settings.miniBarLayoutMinimal" value="minimal">Minimal</option>
-            <option data-i18n="settings.miniBarLayoutStandard" value="standard">Standard</option>
-            <option data-i18n="settings.miniBarLayoutDetailed" value="detailed">Detailed</option>
-          </select>
-        </label>
-        <label>
-          <span data-i18n="settings.miniBarPosition">Posisi</span>
-          <select id="miniBarPositionSelect">
-            <option data-i18n="settings.positionTopLeft" value="top-left">Kiri atas</option>
-            <option data-i18n="settings.positionTopRight" value="top-right">Kanan atas</option>
-            <option data-i18n="settings.positionBottomLeft" value="bottom-left">Kiri bawah</option>
-            <option data-i18n="settings.positionBottomRight" value="bottom-right">Kanan bawah</option>
-            <option data-i18n="settings.positionCustom" value="custom">Custom</option>
-          </select>
-        </label>
-        <label>
-          <span data-i18n="settings.miniBarOpacity">Opacity Mini Bar</span>
-          <input id="miniBarOpacityInput" max="1" min="0.6" step="0.05" type="number" />
-        </label>
-        <label class="toggle-control">
-          <input id="miniBarLockPositionInput" type="checkbox" />
-          <span data-i18n="settings.miniBarLockPosition">Lock posisi</span>
-        </label>
-        <label class="toggle-control">
-          <input id="miniBarShowSsidInput" type="checkbox" />
-          <span data-i18n="settings.miniBarShowSsid">Tampilkan SSID</span>
-        </label>
-        <label class="toggle-control">
-          <input id="miniBarShowTodayUsageInput" type="checkbox" />
-          <span data-i18n="settings.miniBarShowTodayUsage">Tampilkan Hari Ini</span>
-        </label>
-        <label class="toggle-control">
-          <input id="miniBarShowSessionUsageInput" type="checkbox" />
-          <span data-i18n="settings.miniBarShowSessionUsage">Tampilkan Sesi</span>
-        </label>
-        <label class="toggle-control">
-          <input id="miniBarShowTopAppInput" type="checkbox" />
-          <span data-i18n="settings.miniBarShowTopApp">Tampilkan Top App</span>
-        </label>
-        <label class="toggle-control">
-          <input id="miniBarShowStatusInput" type="checkbox" />
-          <span data-i18n="settings.miniBarShowStatus">Tampilkan Status</span>
-        </label>
-        <label class="toggle-control">
-          <input id="miniBarShowRefreshButtonInput" type="checkbox" />
-          <span data-i18n="settings.miniBarShowRefreshButton">Tampilkan tombol Refresh</span>
-        </label>
-        <label class="toggle-control">
-          <input id="miniBarShowOpenButtonInput" type="checkbox" />
-          <span data-i18n="settings.miniBarShowOpenButton">Tampilkan tombol Buka App</span>
-        </label>
-        <label class="toggle-control">
-          <input id="miniBarShowResetButtonInput" type="checkbox" />
-          <span data-i18n="settings.miniBarShowResetButton">Tampilkan tombol Reset</span>
-        </label>
-        <label class="toggle-control">
-          <input id="miniBarShowHideButtonInput" type="checkbox" />
-          <span data-i18n="settings.miniBarShowHideButton">Tampilkan tombol Hide</span>
-        </label>
-        <label class="toggle-control">
-          <input id="miniBarUseShortLabelsInput" type="checkbox" />
-          <span data-i18n="settings.miniBarUseShortLabels">Gunakan label pendek</span>
-        </label>
-        <div class="mini-bar-settings-actions">
-          <button class="secondary-button" data-i18n="button.openMiniBar" id="openMiniBarSettingsButton" type="button">Buka Mini Bar</button>
-          <button class="secondary-button" data-i18n="button.resetMiniBarAppearance" id="resetMiniBarSettingsButton" type="button">Reset Tampilan Mini Bar</button>
-        </div>
         <p class="settings-group-title" data-i18n="settings.networkTarget">Target Jaringan</p>
         <label class="toggle-control">
           <input id="monitorOnlyListedInput" type="checkbox" />
@@ -772,6 +941,7 @@ const elements = {
   estimatesStatus: document.querySelector('#estimatesStatus'),
   historyFilterSelect: document.querySelector('#historyFilterSelect'),
   historyList: document.querySelector('#historyList'),
+  hideMiniBarSettingsButton: document.querySelector('#hideMiniBarSettingsButton'),
   dailyLimitInput: document.querySelector('#dailyLimitInput'),
   dashboardTopAppsList: document.querySelector('#dashboardTopAppsList'),
   developerModeInput: document.querySelector('#developerModeInput'),
@@ -797,11 +967,23 @@ const elements = {
   monitorOnlyListedInput: document.querySelector('#monitorOnlyListedInput'),
   miniHideButton: document.querySelector('#miniHideButton'),
   miniBarAlwaysOnTopInput: document.querySelector('#miniBarAlwaysOnTopInput'),
+  miniActions: document.querySelector('#miniActions'),
+  miniBarAutoSaveNote: document.querySelector('#miniBarAutoSaveNote'),
+  miniBarColorError: document.querySelector('#miniBarColorError'),
+  miniBarColorPickers: document.querySelectorAll('[data-mini-color-picker]'),
+  miniBarColorTexts: document.querySelectorAll('[data-mini-color-text]'),
   miniBarEnabledInput: document.querySelector('#miniBarEnabledInput'),
+  miniBrand: document.querySelector('#miniBrand'),
+  miniDot: document.querySelector('#miniDot'),
   miniBarLayoutSelect: document.querySelector('#miniBarLayoutSelect'),
+  miniBarLayoutStatus: document.querySelector('#miniBarLayoutStatus'),
   miniBarLockPositionInput: document.querySelector('#miniBarLockPositionInput'),
   miniBarOpacityInput: document.querySelector('#miniBarOpacityInput'),
+  miniBarOpacityLabel: document.querySelector('#miniBarOpacityLabel'),
+  miniBarOpacityValue: document.querySelector('#miniBarOpacityValue'),
   miniBarPositionSelect: document.querySelector('#miniBarPositionSelect'),
+  miniBarPositionStatus: document.querySelector('#miniBarPositionStatus'),
+  miniBarPreview: document.querySelector('#miniBarPreview'),
   miniBarShowHideButtonInput: document.querySelector('#miniBarShowHideButtonInput'),
   miniBarShowOpenButtonInput: document.querySelector('#miniBarShowOpenButtonInput'),
   miniBarShowRefreshButtonInput: document.querySelector('#miniBarShowRefreshButtonInput'),
@@ -812,6 +994,8 @@ const elements = {
   miniBarShowTodayUsageInput: document.querySelector('#miniBarShowTodayUsageInput'),
   miniBarShowTopAppInput: document.querySelector('#miniBarShowTopAppInput'),
   miniBarSizeSelect: document.querySelector('#miniBarSizeSelect'),
+  miniBarSizeStatus: document.querySelector('#miniBarSizeStatus'),
+  miniBarStatusText: document.querySelector('#miniBarStatusText'),
   miniBarUseShortLabelsInput: document.querySelector('#miniBarUseShortLabelsInput'),
   miniLimitStatus: document.querySelector('#miniLimitStatus'),
   miniOpenMainButton: document.querySelector('#miniOpenMainButton'),
@@ -852,6 +1036,7 @@ const elements = {
   refreshRealPerAppUsageButton: document.querySelector('#refreshRealPerAppUsageButton'),
   refreshButton: document.querySelector('#refreshButton'),
   resetButton: document.querySelector('#resetButton'),
+  resetMiniBarColorsButton: document.querySelector('#resetMiniBarColorsButton'),
   resetMiniBarSettingsButton: document.querySelector('#resetMiniBarSettingsButton'),
   refreshSuspectsButton: document.querySelector('#refreshSuspectsButton'),
   saveSettingsButton: document.querySelector('#saveSettingsButton'),
@@ -897,6 +1082,8 @@ let currentUsageSamples = [];
 let currentHistorySessions = [];
 let lastSsid = null;
 let isDiagnosticsLoading = false;
+let miniBarAutoSaveTimerId = null;
+let miniBarVisualApplyTimerId = null;
 let activePage = isMiniBarWindow ? 'dashboard' : 'dashboard';
 let currentStartupSettings = {
   launchAtStartup: false,
@@ -943,53 +1130,239 @@ const refreshDeveloperModeUi = () => {
 const setElementVisible = (element, visible) => {
   if (element) {
     element.hidden = !visible;
+    element.style.display = visible ? '' : 'none';
   }
+};
+
+const toOpacityPercent = (value) => `${opacityToSliderValue(value)}%`;
+
+const updateMiniBarOpacityPreview = (value) => {
+  const opacity = normalizeOpacityInput(value);
+  const percent = toOpacityPercent(opacity);
+
+  document.documentElement.style.setProperty('--mini-bar-bg-opacity', String(opacity));
+
+  if (elements.miniBarOpacityLabel) {
+    elements.miniBarOpacityLabel.textContent = `${t('settings.miniBarOpacity')}: ${percent}`;
+  }
+
+  if (elements.miniBarOpacityValue) {
+    elements.miniBarOpacityValue.textContent = percent;
+  }
+};
+
+const applyMiniBarColorVariables = (settings = currentSettings, target = document.documentElement) => {
+  const colors = getMiniBarColorSettings(settings);
+
+  Object.entries(miniBarColorCssVars).forEach(([key, cssVariable]) => {
+    target.style.setProperty(cssVariable, colors[key]);
+  });
+
+  target.style.setProperty('--mini-bar-bg-color-rgb', hexToRgbParts(colors.miniBarBgColor));
+};
+
+const getMiniBarVisibleParts = (settings = currentSettings) => {
+  const layout = settings.miniBarLayout || 'standard';
+  const enabled = Boolean(settings.miniBarEnabled);
+  const hasVisibleData =
+    Boolean(settings.miniBarShowSsid) ||
+    Boolean(settings.miniBarShowTodayUsage) ||
+    Boolean(settings.miniBarShowSessionUsage) ||
+    Boolean(settings.miniBarShowTopApp) ||
+    Boolean(settings.miniBarShowStatus);
+
+  return {
+    brand: !enabled || layout !== 'minimal' || !hasVisibleData,
+    ssid: enabled && layout !== 'minimal' && Boolean(settings.miniBarShowSsid),
+    today: enabled && Boolean(settings.miniBarShowTodayUsage),
+    session: enabled && Boolean(settings.miniBarShowSessionUsage),
+    topApp: enabled && layout === 'detailed' && Boolean(settings.miniBarShowTopApp),
+    status: enabled && Boolean(settings.miniBarShowStatus),
+    refreshButton: enabled && Boolean(settings.miniBarShowRefreshButton),
+    openButton: enabled && Boolean(settings.miniBarShowOpenButton),
+    resetButton: enabled && Boolean(settings.miniBarShowResetButton),
+    hideButton: enabled && Boolean(settings.miniBarShowHideButton),
+  };
+};
+
+const getMiniBarLabel = (type, value) => {
+  const labels = {
+    position: {
+      'top-left': 'settings.positionTopLeft',
+      'top-right': 'settings.positionTopRight',
+      'bottom-left': 'settings.positionBottomLeft',
+      'bottom-right': 'settings.positionBottomRight',
+      custom: 'settings.positionCustom',
+    },
+    layout: {
+      minimal: 'settings.miniBarLayoutMinimal',
+      standard: 'settings.miniBarLayoutStandard',
+      detailed: 'settings.miniBarLayoutDetailed',
+    },
+    size: {
+      compact: 'settings.miniBarSizeCompact',
+      normal: 'settings.miniBarSizeNormal',
+      wide: 'settings.miniBarSizeWide',
+    },
+  };
+  const key = labels[type]?.[value];
+
+  return key ? t(key) : value || '-';
+};
+
+const renderMiniBarPreview = () => {
+  if (!elements.miniBarPreview) {
+    return;
+  }
+
+  const settings = currentSettings;
+  const visibleParts = getMiniBarVisibleParts(settings);
+  const previewSsid = currentWifiInfo?.ssid || 'Yayay';
+  const previewToday = elements.miniTodayUsage.textContent !== '-' ? elements.miniTodayUsage.textContent : '1.23 GB';
+  const previewSession =
+    elements.miniSessionUsage.textContent !== '-' ? elements.miniSessionUsage.textContent : '8.94 MB';
+  const previewTop = elements.miniTopApp.textContent !== '-' ? elements.miniTopApp.textContent : 'Steam 20.10 GB';
+  const previewStatus =
+    elements.miniLimitStatus.textContent !== '-' ? elements.miniLimitStatus.textContent : t('status.safe');
+  const items = [];
+
+  if (visibleParts.brand) {
+    items.push('<strong class="mini-preview-brand">QuotaLens</strong>');
+  }
+
+  if (visibleParts.ssid) {
+    items.push(`<span class="mini-preview-ssid">${escapeHtml(previewSsid)}</span>`);
+  }
+
+  if (visibleParts.today) {
+    items.push(
+      `<span><b>${escapeHtml(t('mini.todayShort'))}</b> <strong>${escapeHtml(previewToday)}</strong></span>`,
+    );
+  }
+
+  if (visibleParts.session) {
+    items.push(
+      `<span><b>${escapeHtml(t('mini.sessionShort'))}</b> <strong>${escapeHtml(previewSession)}</strong></span>`,
+    );
+  }
+
+  if (visibleParts.topApp) {
+    items.push(
+      `<span><b>${escapeHtml(t('mini.topShort'))}</b> <strong>${escapeHtml(previewTop)}</strong></span>`,
+    );
+  }
+
+  if (visibleParts.status) {
+    items.push(`<span class="mini-status">${escapeHtml(previewStatus)}</span>`);
+  }
+
+  const actions = [
+    visibleParts.refreshButton ? '<button type="button">⟳</button>' : '',
+    visibleParts.openButton ? '<button type="button">↗</button>' : '',
+    visibleParts.resetButton ? '<button type="button">↺</button>' : '',
+    visibleParts.hideButton ? '<button class="danger" type="button">×</button>' : '',
+  ].filter(Boolean);
+
+  elements.miniBarPreview.dataset.miniSize = settings.miniBarSize || 'normal';
+  elements.miniBarPreview.dataset.miniLayout = settings.miniBarLayout || 'standard';
+  elements.miniBarPreview.style.setProperty(
+    '--mini-bar-bg-opacity',
+    String(normalizeOpacityInput(settings.miniBarOpacity)),
+  );
+  applyMiniBarColorVariables(settings, elements.miniBarPreview);
+  elements.miniBarPreview.innerHTML = `
+    <div class="mini-preview-content">${items.join('<i aria-hidden="true"></i>')}</div>
+    ${
+      actions.length
+        ? `<div class="mini-preview-actions">${actions.join('')}</div>`
+        : ''
+    }
+  `;
+};
+
+const renderMiniBarSettingsPage = () => {
+  if (!elements.miniBarStatusText) {
+    return;
+  }
+
+  elements.miniBarStatusText.textContent = currentSettings.miniBarEnabled
+    ? t('miniBar.enabled')
+    : t('miniBar.disabled');
+  elements.miniBarPositionStatus.textContent = getMiniBarLabel(
+    'position',
+    currentSettings.miniBarPosition,
+  );
+  elements.miniBarLayoutStatus.textContent = getMiniBarLabel('layout', currentSettings.miniBarLayout);
+  elements.miniBarSizeStatus.textContent = getMiniBarLabel('size', currentSettings.miniBarSize);
+  renderMiniBarPreview();
+};
+
+const setMiniBarColorError = (message = '') => {
+  if (!elements.miniBarColorError) {
+    return;
+  }
+
+  elements.miniBarColorError.hidden = !message;
+  elements.miniBarColorError.textContent = message;
+};
+
+const renderMiniBarColorControls = (settings = currentSettings) => {
+  const colors = getMiniBarColorSettings(settings);
+
+  elements.miniBarColorPickers.forEach((picker) => {
+    const key = picker.dataset.miniColorPicker;
+
+    if (document.activeElement !== picker) {
+      picker.value = colors[key];
+    }
+  });
+
+  elements.miniBarColorTexts.forEach((input) => {
+    const key = input.dataset.miniColorText;
+
+    if (document.activeElement !== input) {
+      input.value = colors[key];
+    }
+  });
 };
 
 const applyMiniBarUiSettings = () => {
   const settings = currentSettings;
   const layout = settings.miniBarLayout || 'standard';
+  const visibleParts = getMiniBarVisibleParts(settings);
+  const actionCount = [
+    visibleParts.refreshButton,
+    visibleParts.openButton,
+    visibleParts.resetButton,
+    visibleParts.hideButton,
+  ].filter(Boolean).length;
+  const dataCount = [
+    visibleParts.ssid,
+    visibleParts.today,
+    visibleParts.session,
+    visibleParts.topApp,
+    visibleParts.status,
+  ].filter(Boolean).length;
 
+  updateMiniBarOpacityPreview(settings.miniBarOpacity);
+  applyMiniBarColorVariables(settings);
   document.body.dataset.miniSize = settings.miniBarSize || 'normal';
   document.body.dataset.miniLayout = layout;
+  document.body.classList.toggle('mini-empty', dataCount === 0 && actionCount === 0);
   document.body.classList.toggle('mini-position-locked', Boolean(settings.miniBarLockPosition));
 
-  setElementVisible(
-    elements.miniWifiSsid,
-    settings.miniBarEnabled && settings.miniBarShowSsid && layout !== 'minimal',
-  );
-  setElementVisible(
-    elements.miniTodayGroup,
-    settings.miniBarEnabled && settings.miniBarShowTodayUsage,
-  );
-  setElementVisible(
-    elements.miniSessionGroup,
-    settings.miniBarEnabled && settings.miniBarShowSessionUsage,
-  );
-  setElementVisible(
-    elements.miniTopAppGroup,
-    settings.miniBarEnabled && settings.miniBarShowTopApp && layout === 'detailed',
-  );
-  setElementVisible(
-    elements.miniLimitStatus,
-    settings.miniBarEnabled && settings.miniBarShowStatus,
-  );
-  setElementVisible(
-    elements.miniRefreshButton,
-    settings.miniBarEnabled && settings.miniBarShowRefreshButton,
-  );
-  setElementVisible(
-    elements.miniOpenMainButton,
-    settings.miniBarEnabled && settings.miniBarShowOpenButton,
-  );
-  setElementVisible(
-    elements.miniResetButton,
-    settings.miniBarEnabled && settings.miniBarShowResetButton,
-  );
-  setElementVisible(
-    elements.miniHideButton,
-    settings.miniBarEnabled && settings.miniBarShowHideButton,
-  );
+  setElementVisible(elements.miniBrand, visibleParts.brand);
+  setElementVisible(elements.miniDot, visibleParts.brand && dataCount > 0);
+  setElementVisible(elements.miniWifiSsid, visibleParts.ssid);
+  setElementVisible(elements.miniTodayGroup, visibleParts.today);
+  setElementVisible(elements.miniSessionGroup, visibleParts.session);
+  setElementVisible(elements.miniTopAppGroup, visibleParts.topApp);
+  setElementVisible(elements.miniLimitStatus, visibleParts.status);
+  setElementVisible(elements.miniActions, actionCount > 0);
+  setElementVisible(elements.miniRefreshButton, visibleParts.refreshButton);
+  setElementVisible(elements.miniOpenMainButton, visibleParts.openButton);
+  setElementVisible(elements.miniResetButton, visibleParts.resetButton);
+  setElementVisible(elements.miniHideButton, visibleParts.hideButton);
 
   const useShortLabels = settings.miniBarUseShortLabels;
 
@@ -1000,6 +1373,7 @@ const applyMiniBarUiSettings = () => {
     ? t('mini.sessionShort')
     : t('metric.currentSession');
   elements.miniTopLabel.textContent = useShortLabels ? t('mini.topShort') : t('mini.topApp');
+  renderMiniBarSettingsPage();
 };
 
 const applyTranslations = (language = currentLanguage) => {
@@ -1117,6 +1491,8 @@ const setLoading = (isLoading, action = 'refresh') => {
   elements.miniResetButton.disabled = isResettingSession || (isLoading && action !== 'refresh');
   elements.openMiniBarButton.disabled = isLoading;
   elements.openMiniBarSettingsButton.disabled = isLoading;
+  elements.hideMiniBarSettingsButton.disabled = isLoading;
+  elements.resetMiniBarColorsButton.disabled = isLoading;
   elements.resetMiniBarSettingsButton.disabled = isLoading;
   elements.clearChartButton.disabled = isLoading;
   elements.clearHistoryButton.disabled = isLoading;
@@ -1249,8 +1625,10 @@ const renderSettings = (settings) => {
   }
 
   if (document.activeElement !== elements.miniBarOpacityInput) {
-    elements.miniBarOpacityInput.value = currentSettings.miniBarOpacity;
+    elements.miniBarOpacityInput.value = opacityToSliderValue(currentSettings.miniBarOpacity);
   }
+
+  updateMiniBarOpacityPreview(elements.miniBarOpacityInput.value || currentSettings.miniBarOpacity);
 
   if (document.activeElement !== elements.miniBarLockPositionInput) {
     elements.miniBarLockPositionInput.checked = currentSettings.miniBarLockPosition;
@@ -1296,6 +1674,7 @@ const renderSettings = (settings) => {
     elements.miniBarUseShortLabelsInput.checked = currentSettings.miniBarUseShortLabels;
   }
 
+  renderMiniBarColorControls(currentSettings);
   applyMiniBarUiSettings();
   renderMonitoredSsids(currentSettings.monitoredSsids);
 };
@@ -1452,7 +1831,40 @@ const collectSettingsFromInputs = (overrides = {}) => ({
   miniBarShowResetButton: elements.miniBarShowResetButtonInput.checked,
   miniBarShowHideButton: elements.miniBarShowHideButtonInput.checked,
   miniBarUseShortLabels: elements.miniBarUseShortLabelsInput.checked,
+  ...getMiniBarColorSettingsFromInputs(),
   language: normalizeLanguage(elements.languageSelect.value),
+  ...overrides,
+});
+
+const getMiniBarColorSettingsFromInputs = () =>
+  Object.fromEntries(
+    miniBarColorFields.map(([key]) => {
+      const input = document.querySelector(`[data-mini-color-text="${key}"]`);
+      const color = normalizeHexColorInput(input?.value, currentSettings[key] || fallbackSettings[key]);
+
+      return [key, color];
+    }),
+  );
+
+const collectMiniBarSettingsFromInputs = (overrides = {}) => ({
+  miniBarEnabled: elements.miniBarEnabledInput.checked,
+  miniBarAlwaysOnTop: elements.miniBarAlwaysOnTopInput.checked,
+  miniBarOpacity: normalizeOpacityInput(elements.miniBarOpacityInput.value, currentSettings.miniBarOpacity),
+  miniBarSize: elements.miniBarSizeSelect.value,
+  miniBarLayout: elements.miniBarLayoutSelect.value,
+  miniBarPosition: elements.miniBarPositionSelect.value,
+  miniBarLockPosition: elements.miniBarLockPositionInput.checked,
+  miniBarShowSsid: elements.miniBarShowSsidInput.checked,
+  miniBarShowTodayUsage: elements.miniBarShowTodayUsageInput.checked,
+  miniBarShowSessionUsage: elements.miniBarShowSessionUsageInput.checked,
+  miniBarShowTopApp: elements.miniBarShowTopAppInput.checked,
+  miniBarShowStatus: elements.miniBarShowStatusInput.checked,
+  miniBarShowRefreshButton: elements.miniBarShowRefreshButtonInput.checked,
+  miniBarShowOpenButton: elements.miniBarShowOpenButtonInput.checked,
+  miniBarShowResetButton: elements.miniBarShowResetButtonInput.checked,
+  miniBarShowHideButton: elements.miniBarShowHideButtonInput.checked,
+  miniBarUseShortLabels: elements.miniBarUseShortLabelsInput.checked,
+  ...getMiniBarColorSettingsFromInputs(),
   ...overrides,
 });
 
@@ -1774,6 +2186,7 @@ const renderTopAppsSummary = (perAppUsage = currentRealPerAppUsage) => {
       emptyMessage,
     )}</p>`;
     elements.miniTopApp.textContent = '-';
+    renderMiniBarPreview();
     return;
   }
 
@@ -1796,6 +2209,7 @@ const renderTopAppsSummary = (perAppUsage = currentRealPerAppUsage) => {
   elements.miniTopApp.textContent = `${topApp.appName || topApp.processName || 'Unknown'} ${formatUsage(
     topApp.totalBytes,
   )}`;
+  renderMiniBarPreview();
 };
 
 const renderRealPerAppUsage = (perAppUsage) => {
@@ -2289,6 +2703,8 @@ const renderDashboard = ({
   } else {
     setStatus(t('status.monitoringPaused'), 'paused');
   }
+
+  renderMiniBarPreview();
 };
 
 const renderError = (message) => {
@@ -2828,6 +3244,137 @@ const hideMiniBar = async () => {
   }
 };
 
+const saveMiniBarSettingsNow = async () => {
+  if (!ensureApi('updateMiniBarSettings')) {
+    return;
+  }
+
+  const miniBarSettings = collectMiniBarSettingsFromInputs();
+  currentSettings = {
+    ...currentSettings,
+    ...miniBarSettings,
+  };
+  applyMiniBarUiSettings();
+  elements.miniBarAutoSaveNote.textContent = t('miniBar.autoSaveSaving');
+
+  try {
+    const result = await window.quotaLens.updateMiniBarSettings(miniBarSettings);
+
+    if (!result.ok) {
+      throw new Error(result.error);
+    }
+
+    renderSettings(result.settings);
+    elements.miniBarAutoSaveNote.textContent = t('miniBar.autoSaveSaved');
+  } catch (error) {
+    renderError(error.message || t('miniBar.autoSaveFailed'));
+    elements.miniBarAutoSaveNote.textContent = t('miniBar.autoSaveFailed');
+  }
+};
+
+const applyMiniBarSettingsToWindow = async () => {
+  if (!window.quotaLens?.applyMiniBarSettings) {
+    return;
+  }
+
+  try {
+    await window.quotaLens.applyMiniBarSettings(collectMiniBarSettingsFromInputs());
+  } catch (error) {
+    console.debug('QuotaLens failed to apply Mini Bar settings visually:', error);
+  }
+};
+
+const scheduleMiniBarVisualApply = () => {
+  clearTimeout(miniBarVisualApplyTimerId);
+  miniBarVisualApplyTimerId = null;
+  applyMiniBarSettingsToWindow();
+};
+
+const scheduleMiniBarAutoSave = () => {
+  clearTimeout(miniBarAutoSaveTimerId);
+  const miniBarSettings = collectMiniBarSettingsFromInputs();
+
+  currentSettings = {
+    ...currentSettings,
+    ...miniBarSettings,
+  };
+  applyMiniBarUiSettings();
+  elements.miniBarAutoSaveNote.textContent = t('miniBar.autoSaveNote');
+  scheduleMiniBarVisualApply();
+
+  miniBarAutoSaveTimerId = window.setTimeout(() => {
+    saveMiniBarSettingsNow();
+  }, 200);
+};
+
+const handleMiniBarColorPickerInput = (event) => {
+  const key = event.target.dataset.miniColorPicker;
+  const color = normalizeHexColorInput(event.target.value, fallbackSettings[key]);
+  const textInput = document.querySelector(`[data-mini-color-text="${key}"]`);
+
+  event.target.value = color;
+
+  if (textInput) {
+    textInput.value = color;
+  }
+
+  setMiniBarColorError('');
+  scheduleMiniBarAutoSave();
+};
+
+const handleMiniBarColorTextInput = (event) => {
+  const key = event.target.dataset.miniColorText;
+  const color = normalizeHexColorInput(event.target.value);
+  const picker = document.querySelector(`[data-mini-color-picker="${key}"]`);
+
+  if (!color) {
+    setMiniBarColorError(t('miniBar.invalidColor'));
+    return;
+  }
+
+  event.target.value = color;
+
+  if (picker) {
+    picker.value = color;
+  }
+
+  setMiniBarColorError('');
+  scheduleMiniBarAutoSave();
+};
+
+const resetMiniBarColors = async () => {
+  if (isRefreshing) {
+    return;
+  }
+
+  if (!ensureApi('updateMiniBarSettings')) {
+    return;
+  }
+
+  clearTimeout(miniBarAutoSaveTimerId);
+  isRefreshing = true;
+  setLoading(true, 'settings');
+  setStatus(t('status.savingSettings'), 'loading');
+
+  try {
+    const result = await window.quotaLens.updateMiniBarSettings(miniBarDefaultColorSettings);
+
+    if (!result.ok) {
+      throw new Error(result.error);
+    }
+
+    setMiniBarColorError('');
+    renderSettings(result.settings);
+    elements.miniBarAutoSaveNote.textContent = t('miniBar.colorAutoSaveSaved');
+  } catch (error) {
+    renderError(error.message || t('miniBar.autoSaveFailed'));
+    elements.miniBarAutoSaveNote.textContent = t('miniBar.autoSaveFailed');
+  } finally {
+    isRefreshing = false;
+    setLoading(false);
+  }
+};
+
 const resetMiniBarSettings = async () => {
   if (isRefreshing) {
     return;
@@ -2837,6 +3384,7 @@ const resetMiniBarSettings = async () => {
     return;
   }
 
+  clearTimeout(miniBarAutoSaveTimerId);
   isRefreshing = true;
   setLoading(true, 'settings');
   setStatus(t('status.savingSettings'), 'loading');
@@ -2849,10 +3397,10 @@ const resetMiniBarSettings = async () => {
     }
 
     renderSettings(result.settings);
-    elements.settingsNote.textContent = t('settings.miniBarReset');
+    elements.miniBarAutoSaveNote.textContent = t('settings.miniBarReset');
   } catch (error) {
     renderError(error.message || t('settings.miniBarResetFailed'));
-    elements.settingsNote.textContent = t('settings.miniBarResetFailed');
+    elements.miniBarAutoSaveNote.textContent = t('settings.miniBarResetFailed');
   } finally {
     isRefreshing = false;
     setLoading(false);
@@ -2998,6 +3546,10 @@ const unsubscribeMonitoringCommand = window.quotaLens?.onMonitoringCommand?.((co
   }
 });
 
+const unsubscribeSettingsUpdated = window.quotaLens?.onSettingsUpdated?.((settings) => {
+  renderSettings(settings);
+});
+
 elements.navButtons.forEach((button) => {
   button.addEventListener('click', () => {
     setActivePage(button.dataset.pageTarget);
@@ -3033,7 +3585,39 @@ elements.saveStartupButton.addEventListener('click', saveStartupSettings);
 elements.createShortcutButton.addEventListener('click', createDesktopShortcut);
 elements.openMiniBarButton.addEventListener('click', openMiniBar);
 elements.openMiniBarSettingsButton.addEventListener('click', openMiniBar);
+elements.hideMiniBarSettingsButton.addEventListener('click', hideMiniBar);
+elements.resetMiniBarColorsButton.addEventListener('click', resetMiniBarColors);
 elements.resetMiniBarSettingsButton.addEventListener('click', resetMiniBarSettings);
+elements.miniBarOpacityInput.addEventListener('input', (event) => {
+  updateMiniBarOpacityPreview(event.target.value);
+  scheduleMiniBarAutoSave();
+});
+elements.miniBarColorPickers.forEach((picker) => {
+  picker.addEventListener('input', handleMiniBarColorPickerInput);
+});
+elements.miniBarColorTexts.forEach((input) => {
+  input.addEventListener('input', handleMiniBarColorTextInput);
+});
+[
+  elements.miniBarEnabledInput,
+  elements.miniBarAlwaysOnTopInput,
+  elements.miniBarSizeSelect,
+  elements.miniBarLayoutSelect,
+  elements.miniBarPositionSelect,
+  elements.miniBarLockPositionInput,
+  elements.miniBarShowSsidInput,
+  elements.miniBarShowTodayUsageInput,
+  elements.miniBarShowSessionUsageInput,
+  elements.miniBarShowTopAppInput,
+  elements.miniBarShowStatusInput,
+  elements.miniBarShowRefreshButtonInput,
+  elements.miniBarShowOpenButtonInput,
+  elements.miniBarShowResetButtonInput,
+  elements.miniBarShowHideButtonInput,
+  elements.miniBarUseShortLabelsInput,
+].forEach((control) => {
+  control.addEventListener('change', scheduleMiniBarAutoSave);
+});
 elements.miniRefreshButton.addEventListener('click', () => refreshUsage());
 elements.miniOpenMainButton.addEventListener('click', showMainWindow);
 elements.miniResetButton.addEventListener('click', resetSession);
@@ -3067,7 +3651,10 @@ document.addEventListener('visibilitychange', handleVisibilityChange);
 window.addEventListener('beforeunload', () => {
   clearRefreshTimer();
   clearSuspectsTimer();
+  clearTimeout(miniBarAutoSaveTimerId);
+  clearTimeout(miniBarVisualApplyTimerId);
   unsubscribeMonitoringCommand?.();
+  unsubscribeSettingsUpdated?.();
 });
 
 applyTranslations(currentLanguage);

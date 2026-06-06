@@ -20,6 +20,7 @@ const string srumNotFoundReason = "SRUM database was not found in known Windows 
 
 var mode = GetMode(args);
 var periodWindow = GetPeriodWindow(args);
+SrumTempCleanupState.Merge(SrumTempCache.CleanupOldRuns());
 var result = mode == "srum-inspect"
     ? RunSrumInspect(periodWindow)
     : CreateResult(
@@ -155,7 +156,7 @@ static object RunSrumInspect(PeriodWindow periodWindow)
                     accessCheckSourceMethod,
                     discovery.FoundPath,
                     discovery.FoundPath,
-                    "",
+                    copiedPath,
                     discovery.DiscoveryStatus,
                     discovery.CheckedPaths,
                     copyStrategyUsed: copyResult.CopyStrategyUsed,
@@ -264,6 +265,8 @@ static object CreateResult(
         copyError,
         recoveryStatus,
         recoveryError);
+    SrumTempCleanupState.Merge(SrumTempCache.DeleteRunFolderForCopiedPath(copiedPath));
+    var tempCleanup = SrumTempCleanupState.Current;
 
     return new
     {
@@ -302,6 +305,10 @@ static object CreateResult(
         periodEnd,
         isAdministrator,
         requiresAdministrator,
+        tempCleanupStatus = tempCleanup.Status,
+        tempCleanupDeletedBytes = tempCleanup.DeletedBytes,
+        tempCleanupDeletedFolders = tempCleanup.DeletedFolders,
+        tempCleanupError = tempCleanup.Error,
         apps = (apps ?? Array.Empty<AppUsage>()).ToArray(),
         collectedAt = DateTimeOffset.UtcNow.ToString("O")
     };
@@ -1238,6 +1245,236 @@ sealed record SrumRecoveryResult(
     string RecoveryError)
 {
     public static SrumRecoveryResult NotNeeded() => new(true, "not_needed", "none", "");
+}
+
+sealed record SrumTempCleanupResult(
+    string Status,
+    long DeletedBytes,
+    int DeletedFolders,
+    string Error);
+
+static class SrumTempCleanupState
+{
+    private static long deletedBytes;
+    private static int deletedFolders;
+    private static readonly List<string> errors = new();
+    private static bool attempted;
+
+    public static SrumTempCleanupResult Current
+    {
+        get
+        {
+            var status = !attempted
+                ? "not_started"
+                : errors.Count == 0
+                    ? "success"
+                    : deletedBytes > 0 || deletedFolders > 0
+                        ? "partial"
+                        : "failed";
+
+            return new SrumTempCleanupResult(
+                status,
+                deletedBytes,
+                deletedFolders,
+                string.Join("; ", errors.Distinct()));
+        }
+    }
+
+    public static void Merge(SrumTempCleanupResult result)
+    {
+        if (result.Status == "not_started")
+        {
+            return;
+        }
+
+        attempted = true;
+        deletedBytes += Math.Max(0, result.DeletedBytes);
+        deletedFolders += Math.Max(0, result.DeletedFolders);
+
+        if (!string.IsNullOrWhiteSpace(result.Error))
+        {
+            errors.Add(result.Error);
+        }
+    }
+}
+
+static class SrumTempCache
+{
+    private const long MaxCacheBytes = 500L * 1024L * 1024L;
+    private const int MaxRunFolders = 3;
+    private static readonly TimeSpan MaxFolderAge = TimeSpan.FromDays(1);
+
+    public static SrumTempCleanupResult CleanupOldRuns()
+    {
+        var root = GetSrumTempRoot();
+
+        if (!Directory.Exists(root))
+        {
+            return new SrumTempCleanupResult("skipped:not_found", 0, 0, "");
+        }
+
+        try
+        {
+            var now = DateTimeOffset.UtcNow;
+            var folders = GetRunFolders(root)
+                .OrderByDescending((folder) => folder.LastWriteTimeUtc)
+                .ToList();
+            var foldersToDelete = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var folder in folders)
+            {
+                var age = now - new DateTimeOffset(folder.LastWriteTimeUtc);
+
+                if (age > MaxFolderAge)
+                {
+                    foldersToDelete.Add(folder.FullName);
+                }
+            }
+
+            foreach (var folder in folders.Skip(MaxRunFolders))
+            {
+                foldersToDelete.Add(folder.FullName);
+            }
+
+            var retainedFolders = folders
+                .Where((folder) => !foldersToDelete.Contains(folder.FullName))
+                .OrderBy((folder) => folder.LastWriteTimeUtc)
+                .ToList();
+            var retainedBytes = retainedFolders.Sum((folder) => GetDirectorySize(folder.FullName));
+
+            foreach (var folder in retainedFolders)
+            {
+                if (retainedBytes <= MaxCacheBytes)
+                {
+                    break;
+                }
+
+                foldersToDelete.Add(folder.FullName);
+                retainedBytes -= GetDirectorySize(folder.FullName);
+            }
+
+            return DeleteFolders(foldersToDelete);
+        }
+        catch (Exception error)
+        {
+            return new SrumTempCleanupResult("failed", 0, 0, error.Message);
+        }
+    }
+
+    public static SrumTempCleanupResult DeleteRunFolderForCopiedPath(string copiedPath)
+    {
+        if (string.IsNullOrWhiteSpace(copiedPath))
+        {
+            return new SrumTempCleanupResult("not_started", 0, 0, "");
+        }
+
+        try
+        {
+            var root = GetSrumTempRoot();
+            var fullRoot = Path.GetFullPath(root);
+            var folder = Path.GetDirectoryName(Path.GetFullPath(copiedPath));
+
+            if (string.IsNullOrWhiteSpace(folder))
+            {
+                return new SrumTempCleanupResult("not_started", 0, 0, "");
+            }
+
+            var fullFolder = Path.GetFullPath(folder);
+
+            if (!IsChildPath(fullRoot, fullFolder) || string.Equals(fullRoot, fullFolder, StringComparison.OrdinalIgnoreCase))
+            {
+                return new SrumTempCleanupResult("skipped:outside_srum_temp", 0, 0, "");
+            }
+
+            return DeleteFolders(new[] { fullFolder });
+        }
+        catch (Exception error)
+        {
+            return new SrumTempCleanupResult("failed", 0, 0, error.Message);
+        }
+    }
+
+    public static string GetSrumTempRoot() => Path.Combine(Path.GetTempPath(), "QuotaLens", "srum");
+
+    private static IEnumerable<DirectoryInfo> GetRunFolders(string root)
+    {
+        try
+        {
+            return new DirectoryInfo(root)
+                .EnumerateDirectories()
+                .Where((folder) => !folder.Attributes.HasFlag(FileAttributes.ReparsePoint))
+                .ToArray();
+        }
+        catch
+        {
+            return Array.Empty<DirectoryInfo>();
+        }
+    }
+
+    private static SrumTempCleanupResult DeleteFolders(IEnumerable<string> folderPaths)
+    {
+        long deletedBytes = 0;
+        var deletedFolders = 0;
+        var errors = new List<string>();
+
+        foreach (var folderPath in folderPaths.Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            try
+            {
+                if (!Directory.Exists(folderPath))
+                {
+                    continue;
+                }
+
+                var folderSize = GetDirectorySize(folderPath);
+                Directory.Delete(folderPath, recursive: true);
+                deletedBytes += folderSize;
+                deletedFolders += 1;
+            }
+            catch (Exception error)
+            {
+                errors.Add($"{Path.GetFileName(folderPath)}:{error.Message}");
+            }
+        }
+
+        var status = errors.Count == 0 ? "success" : deletedFolders > 0 ? "partial" : "failed";
+
+        return new SrumTempCleanupResult(status, deletedBytes, deletedFolders, string.Join("; ", errors));
+    }
+
+    private static long GetDirectorySize(string folderPath)
+    {
+        try
+        {
+            return Directory
+                .EnumerateFiles(folderPath, "*", SearchOption.AllDirectories)
+                .Sum((filePath) =>
+                {
+                    try
+                    {
+                        return new FileInfo(filePath).Length;
+                    }
+                    catch
+                    {
+                        return 0L;
+                    }
+                });
+        }
+        catch
+        {
+            return 0L;
+        }
+    }
+
+    private static bool IsChildPath(string parentPath, string childPath)
+    {
+        var normalizedParent = parentPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+            + Path.DirectorySeparatorChar;
+        var normalizedChild = childPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+            + Path.DirectorySeparatorChar;
+
+        return normalizedChild.StartsWith(normalizedParent, StringComparison.OrdinalIgnoreCase);
+    }
 }
 
 sealed record PeriodWindow(string Period, DateTimeOffset? Start, DateTimeOffset End);

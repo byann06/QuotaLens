@@ -68,6 +68,10 @@ const createUnsupportedResult = (reason = lightweightUnsupportedReason) => ({
   recoveryStrategyUsed: 'none',
   copiedSupportFiles: [],
   recoveryError: '',
+  tempCleanupStatus: 'not_started',
+  tempCleanupDeletedBytes: 0,
+  tempCleanupDeletedFolders: 0,
+  tempCleanupError: '',
   period: defaultPeriod,
   periodStart: '',
   periodEnd: '',
@@ -143,6 +147,12 @@ const normalizeResult = (result = {}) => ({
     ? result.copiedSupportFiles.map(String)
     : [],
   recoveryError: result.recoveryError ? String(result.recoveryError) : '',
+  tempCleanupStatus: result.tempCleanupStatus
+    ? String(result.tempCleanupStatus)
+    : 'unknown',
+  tempCleanupDeletedBytes: toNumber(result.tempCleanupDeletedBytes),
+  tempCleanupDeletedFolders: toNumber(result.tempCleanupDeletedFolders),
+  tempCleanupError: result.tempCleanupError ? String(result.tempCleanupError) : '',
   period: result.period ? String(result.period) : defaultPeriod,
   periodStart: result.periodStart ? String(result.periodStart) : '',
   periodEnd: result.periodEnd ? String(result.periodEnd) : '',
