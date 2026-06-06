@@ -23,6 +23,7 @@ const fallbackSettings = {
   miniBarLayout: 'standard',
   miniBarPosition: 'top-right',
   miniBarLockPosition: false,
+  miniBarShowBorder: true,
   miniBarGamingMode: false,
   miniBarClickThrough: false,
   miniBarHideButtonsUntilHover: true,
@@ -301,7 +302,7 @@ app.innerHTML = `
     <section class="mini-bar-panel" aria-live="polite">
       <div class="mini-drag-strip">
         <strong class="mini-brand" id="miniBrand">QuotaLens</strong>
-        <span class="mini-dot" id="miniDot">·</span>
+        <span class="mini-dot" id="miniDot">|</span>
         <span class="mini-ssid" id="miniWifiSsid">Mendeteksi...</span>
         <span class="mini-metric" id="miniTodayGroup"><b data-i18n="mini.todayShort" id="miniTodayLabel">Hari ini</b> <strong id="miniTodayUsage">-</strong></span>
         <span class="mini-metric" id="miniSessionGroup"><b data-i18n="mini.sessionShort" id="miniSessionLabel">Sesi</b> <strong id="miniSessionUsage">-</strong></span>
@@ -551,8 +552,8 @@ app.innerHTML = `
           <label>
             <span data-i18n="perApp.periodFilter">Periode</span>
             <select id="realPerAppPeriodSelect">
-              <option data-i18n="perApp.periodToday" value="today">Hari ini</option>
-              <option data-i18n="perApp.period7d" selected value="7d">7 hari terakhir</option>
+              <option data-i18n="perApp.periodToday" selected value="today">Hari ini</option>
+              <option data-i18n="perApp.period7d" value="7d">7 hari terakhir</option>
               <option data-i18n="perApp.period30d" value="30d">30 hari terakhir</option>
               <option data-i18n="perApp.periodAll" value="all">Semua riwayat</option>
             </select>
@@ -582,7 +583,7 @@ app.innerHTML = `
         </div>
         <div>
           <span data-i18n="perApp.activePeriod">Periode Aktif</span>
-          <strong id="realPerAppPeriodActive">7 hari terakhir</strong>
+          <strong id="realPerAppPeriodActive">Hari ini</strong>
         </div>
       </div>
       <p class="per-app-unsupported" id="realPerAppUsageReason"></p>
@@ -749,6 +750,10 @@ app.innerHTML = `
           <label class="toggle-control">
             <input id="miniBarLockPositionInput" type="checkbox" />
             <span data-i18n="settings.miniBarLockPosition">Lock posisi</span>
+          </label>
+          <label class="toggle-control">
+            <input id="miniBarShowBorderInput" type="checkbox" />
+            <span data-i18n="settings.miniBarShowBorder">Tampilkan border Mini Bar</span>
           </label>
           <label class="toggle-control">
             <input id="miniBarUseShortLabelsInput" type="checkbox" />
@@ -1042,6 +1047,7 @@ const elements = {
   miniBarLayoutSelect: document.querySelector('#miniBarLayoutSelect'),
   miniBarLayoutStatus: document.querySelector('#miniBarLayoutStatus'),
   miniBarLockPositionInput: document.querySelector('#miniBarLockPositionInput'),
+  miniBarShowBorderInput: document.querySelector('#miniBarShowBorderInput'),
   miniBarClickThroughInput: document.querySelector('#miniBarClickThroughInput'),
   miniBarConfirmHideInput: document.querySelector('#miniBarConfirmHideInput'),
   miniBarHideButtonsUntilHoverInput: document.querySelector('#miniBarHideButtonsUntilHoverInput'),
@@ -1151,7 +1157,7 @@ let currentWifiInfo = null;
 let currentAppSuspects = null;
 let currentAppUsageEstimates = null;
 let currentRealPerAppUsage = null;
-let selectedRealPerAppPeriod = '7d';
+let selectedRealPerAppPeriod = 'today';
 let selectedHistoryFilter = 'recent';
 let currentUsageSamples = [];
 let currentHistorySessions = [];
@@ -1341,6 +1347,7 @@ const renderMiniBarPreview = () => {
   elements.miniBarPreview.dataset.miniSize = settings.miniBarSize || 'normal';
   elements.miniBarPreview.dataset.miniLayout = settings.miniBarLayout || 'standard';
   elements.miniBarPreview.classList.toggle('mini-gaming-mode', Boolean(settings.miniBarGamingMode));
+  elements.miniBarPreview.classList.toggle('mini-no-border', !settings.miniBarShowBorder);
   elements.miniBarPreview.classList.toggle(
     'mini-hide-actions-until-hover',
     Boolean(settings.miniBarGamingMode && settings.miniBarHideButtonsUntilHover),
@@ -1430,6 +1437,7 @@ const applyMiniBarUiSettings = () => {
   document.body.dataset.miniLayout = layout;
   document.body.classList.toggle('mini-empty', dataCount === 0 && actionCount === 0);
   document.body.classList.toggle('mini-position-locked', Boolean(settings.miniBarLockPosition));
+  document.body.classList.toggle('mini-no-border', !settings.miniBarShowBorder);
   document.body.classList.toggle('mini-gaming-mode', Boolean(settings.miniBarGamingMode));
   document.body.classList.toggle(
     'mini-hide-actions-until-hover',
@@ -1718,6 +1726,10 @@ const renderSettings = (settings) => {
 
   if (document.activeElement !== elements.miniBarLockPositionInput) {
     elements.miniBarLockPositionInput.checked = currentSettings.miniBarLockPosition;
+  }
+
+  if (document.activeElement !== elements.miniBarShowBorderInput) {
+    elements.miniBarShowBorderInput.checked = currentSettings.miniBarShowBorder;
   }
 
   if (document.activeElement !== elements.miniBarGamingModeInput) {
@@ -2018,6 +2030,7 @@ const collectSettingsFromInputs = (overrides = {}) => ({
   miniBarLayout: elements.miniBarLayoutSelect.value,
   miniBarPosition: elements.miniBarPositionSelect.value,
   miniBarLockPosition: elements.miniBarLockPositionInput.checked,
+  miniBarShowBorder: elements.miniBarShowBorderInput.checked,
   miniBarGamingMode: elements.miniBarGamingModeInput.checked,
   miniBarClickThrough: elements.miniBarClickThroughInput.checked,
   miniBarHideButtonsUntilHover: elements.miniBarHideButtonsUntilHoverInput.checked,
@@ -2055,6 +2068,7 @@ const collectMiniBarSettingsFromInputs = (overrides = {}) => ({
   miniBarLayout: elements.miniBarLayoutSelect.value,
   miniBarPosition: elements.miniBarPositionSelect.value,
   miniBarLockPosition: elements.miniBarLockPositionInput.checked,
+  miniBarShowBorder: elements.miniBarShowBorderInput.checked,
   miniBarGamingMode: elements.miniBarGamingModeInput.checked,
   miniBarClickThrough: elements.miniBarClickThroughInput.checked,
   miniBarHideButtonsUntilHover: elements.miniBarHideButtonsUntilHoverInput.checked,
@@ -2430,6 +2444,7 @@ const renderRealPerAppUsage = (perAppUsage) => {
     perAppUsage?.reason ||
     (!supported ? t('perApp.unsupportedMessage') : '');
   const showInvestigationDetails = isDeveloperModeEnabled();
+  const showFullInvestigationDetails = showInvestigationDetails && activePage === 'developer';
 
   renderTopAppsSummary(perAppUsage);
 
@@ -2562,16 +2577,49 @@ const renderRealPerAppUsage = (perAppUsage) => {
       : '',
   ].filter(Boolean);
 
+  const compactInvestigationDetails = [
+    `${t('perApp.adminModeLabel')}: ${adminModeText}`,
+    perAppUsage?.accessStatus ? `${t('perApp.accessStatus')}: ${perAppUsage.accessStatus}` : '',
+    perAppUsage?.parseStatus ? `${t('perApp.parseStatus')}: ${perAppUsage.parseStatus}` : '',
+    perAppUsage?.copyStrategyUsed
+      ? `${t('perApp.copyStrategyUsed')}: ${perAppUsage.copyStrategyUsed}`
+      : '',
+    perAppUsage?.recoveryStatus
+      ? `${t('perApp.recoveryStatus')}: ${perAppUsage.recoveryStatus}`
+      : '',
+    perAppUsage?.helperExists !== undefined
+      ? `${t('perApp.helperExists')}: ${perAppUsage.helperExists ? 'true' : 'false'}`
+      : '',
+  ].filter(Boolean);
+
+  const investigationHtml = showInvestigationDetails
+    ? `
+      <div class="per-app-investigation${showFullInvestigationDetails ? '' : ' compact'}">
+        ${
+          showFullInvestigationDetails
+            ? investigationDetails.map((detail) => `<p>${escapeHtml(detail)}</p>`).join('')
+            : `
+              ${compactInvestigationDetails.map((detail) => `<p>${escapeHtml(detail)}</p>`).join('')}
+              ${
+                investigationDetails.length
+                  ? `<details>
+                <summary>${escapeHtml(t('perApp.showTechnicalDetails'))}</summary>
+                <div>${investigationDetails
+                  .map((detail) => `<p>${escapeHtml(detail)}</p>`)
+                  .join('')}</div>
+              </details>`
+                  : ''
+              }
+            `
+        }
+      </div>
+    `
+    : '';
+
   if (!supported) {
     elements.realPerAppUsageList.innerHTML = `
       <p class="history-empty">${escapeHtml(t('perApp.empty'))}</p>
-      ${
-        showInvestigationDetails && investigationDetails.length
-          ? `<div class="per-app-investigation">${investigationDetails
-              .map((detail) => `<p>${escapeHtml(detail)}</p>`)
-              .join('')}</div>`
-          : ''
-      }
+      ${investigationHtml}
     `;
     elements.realPerAppUsageNote.textContent = perAppUsage?.collectedAt
       ? tf('perApp.lastRefresh', { time: formatDateTime(perAppUsage.collectedAt) })
@@ -2590,13 +2638,7 @@ const renderRealPerAppUsage = (perAppUsage) => {
   }
 
   elements.realPerAppUsageList.innerHTML = `
-    ${
-      showInvestigationDetails && investigationDetails.length
-        ? `<div class="per-app-investigation">${investigationDetails
-            .map((detail) => `<p>${escapeHtml(detail)}</p>`)
-            .join('')}</div>`
-        : ''
-    }
+    ${investigationHtml}
     ${apps
       .map((appUsage) => {
       const appName = appUsage.appName || appUsage.processName || 'Unknown';
@@ -3843,6 +3885,7 @@ elements.miniBarColorTexts.forEach((input) => {
   elements.miniBarLayoutSelect,
   elements.miniBarPositionSelect,
   elements.miniBarLockPositionInput,
+  elements.miniBarShowBorderInput,
   elements.miniBarGamingModeInput,
   elements.miniBarHideButtonsUntilHoverInput,
   elements.miniBarConfirmHideInput,

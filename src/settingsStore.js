@@ -12,6 +12,7 @@ export const miniBarDefaultSettings = {
   miniBarLayout: 'standard',
   miniBarPosition: 'top-right',
   miniBarLockPosition: false,
+  miniBarShowBorder: true,
   miniBarGamingMode: false,
   miniBarClickThrough: false,
   miniBarHideButtonsUntilHover: true,
@@ -220,6 +221,10 @@ const normalizeSettings = (settings = {}) => ({
     typeof settings.miniBarLockPosition === 'boolean'
       ? settings.miniBarLockPosition
       : defaultSettings.miniBarLockPosition,
+  miniBarShowBorder:
+    typeof settings.miniBarShowBorder === 'boolean'
+      ? settings.miniBarShowBorder
+      : defaultSettings.miniBarShowBorder,
   miniBarGamingMode:
     typeof settings.miniBarGamingMode === 'boolean'
       ? settings.miniBarGamingMode

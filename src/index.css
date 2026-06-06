@@ -762,8 +762,8 @@ h1 {
   --preview-width: 520px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+  justify-content: flex-start;
+  gap: 5px;
   width: min(100%, var(--preview-width));
   min-height: 48px;
   padding: 7px 9px;
@@ -772,6 +772,10 @@ h1 {
   border-radius: 8px;
   background: rgba(var(--mini-bar-bg-color-rgb), var(--mini-bar-bg-opacity, 0.95));
   box-shadow: 0 14px 40px rgba(0, 0, 0, 0.3);
+}
+
+.mini-preview-bar.mini-no-border {
+  border-color: transparent;
 }
 
 .mini-preview-bar[data-mini-size='compact'] {
@@ -789,12 +793,12 @@ h1 {
   display: flex;
   align-items: center;
   min-width: 0;
-  gap: 7px;
+  gap: 6px;
   white-space: nowrap;
 }
 
 .mini-preview-content {
-  flex: 1;
+  flex: 0 1 auto;
   overflow: hidden;
 }
 
@@ -808,9 +812,15 @@ h1 {
 
 .mini-preview-content i {
   flex: 0 0 auto;
-  width: 1px;
-  height: 16px;
-  background: var(--mini-bar-accent-color);
+  width: auto;
+  height: auto;
+  background: transparent;
+}
+
+.mini-preview-content i::before {
+  content: '|';
+  color: var(--mini-bar-accent-color);
+  font-weight: 800;
 }
 
 .mini-preview-content b {
@@ -826,7 +836,15 @@ h1 {
 
 .mini-preview-actions {
   flex: 0 0 auto;
-  gap: 4px;
+  gap: 1px;
+}
+
+.mini-preview-actions::before {
+  content: '|';
+  align-self: center;
+  margin: 0 3px 0 0;
+  color: var(--mini-bar-accent-color);
+  font-weight: 800;
 }
 
 .mini-preview-actions button {
@@ -834,15 +852,14 @@ h1 {
   width: 24px;
   height: 24px;
   place-items: center;
-  border: 1px solid var(--mini-bar-border-color);
+  border: 0;
   border-radius: 6px;
-  background: var(--mini-bar-button-bg-color);
+  background: transparent;
   color: var(--mini-bar-button-text-color);
   font-weight: 900;
 }
 
 .mini-preview-actions button.danger {
-  border-color: var(--mini-bar-danger-color);
   color: var(--mini-bar-danger-color);
 }
 
@@ -1234,6 +1251,62 @@ h1 {
 
 .per-app-investigation p + p {
   margin-top: 6px;
+}
+
+.per-app-investigation.compact {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 10px;
+  font-size: 0.8rem;
+  line-height: 1.35;
+}
+
+.per-app-investigation.compact p {
+  max-width: 100%;
+  padding: 5px 8px;
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.64);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.per-app-investigation.compact p + p {
+  margin-top: 0;
+}
+
+.per-app-investigation.compact details {
+  flex-basis: 100%;
+  margin-top: 2px;
+}
+
+.per-app-investigation.compact summary {
+  width: fit-content;
+  cursor: pointer;
+  color: #bfdbfe;
+  font-weight: 800;
+}
+
+.per-app-investigation.compact details div {
+  display: grid;
+  gap: 5px;
+  max-height: 220px;
+  margin-top: 8px;
+  padding-top: 8px;
+  overflow: auto;
+  border-top: 1px solid rgba(148, 163, 184, 0.12);
+}
+
+.per-app-investigation.compact details p {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .per-app-list {
@@ -1731,13 +1804,17 @@ body.mini-mode .mini-bar-panel {
 body.mini-mode .mini-bar-panel {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+  justify-content: flex-start;
+  gap: 5px;
   min-height: 0;
   height: calc(100vh - 12px);
   padding: 6px 8px;
   overflow: hidden;
   -webkit-app-region: drag;
+}
+
+body.mini-mode.mini-no-border .mini-bar-panel {
+  border-color: transparent;
 }
 
 body.mini-mode.mini-position-locked .mini-bar-panel,
@@ -1787,8 +1864,8 @@ body.mini-mode[data-mini-size='wide'] .mini-top-app {
   display: flex;
   align-items: center;
   min-width: 0;
-  flex: 1;
-  gap: 8px;
+  flex: 0 1 auto;
+  gap: 6px;
   overflow: hidden;
   white-space: nowrap;
   -webkit-app-region: drag;
@@ -1870,8 +1947,16 @@ body.mini-mode[data-mini-size='wide'] .mini-top-app {
 .mini-actions {
   flex: 0 0 auto;
   justify-content: flex-end;
-  gap: 3px;
+  gap: 1px;
   -webkit-app-region: no-drag;
+}
+
+.mini-actions::before {
+  content: '|';
+  align-self: center;
+  margin: 0 3px 0 0;
+  color: var(--mini-bar-accent-color);
+  font-weight: 800;
 }
 
 .mini-icon-button {
@@ -1880,9 +1965,9 @@ body.mini-mode[data-mini-size='wide'] .mini-top-app {
   height: 24px;
   min-height: 24px;
   place-items: center;
-  border: 1px solid var(--mini-bar-border-color);
+  border: 0;
   border-radius: 6px;
-  background: var(--mini-bar-button-bg-color);
+  background: transparent;
   color: var(--mini-bar-button-text-color);
   cursor: pointer;
   font-size: 0.78rem;
@@ -1891,12 +1976,11 @@ body.mini-mode[data-mini-size='wide'] .mini-top-app {
 }
 
 .mini-icon-button:hover {
-  border-color: var(--mini-bar-accent-color);
+  background: rgba(148, 163, 184, 0.12);
   color: var(--mini-bar-accent-color);
 }
 
 .mini-icon-button.danger {
-  border-color: var(--mini-bar-danger-color);
   color: var(--mini-bar-danger-color);
 }
 
