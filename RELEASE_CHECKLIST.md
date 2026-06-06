@@ -5,12 +5,15 @@ Gunakan checklist ini sebelum build QuotaLens dibagikan atau dirilis.
 ## Startup Aplikasi
 
 - [ ] Aplikasi bisa dibuka.
+- [ ] Packaged app bisa dibuka langsung dari `out/QuotaLens-win32-x64/QuotaLens.exe` tanpa `npm start`.
 - [ ] Hanya satu instance QuotaLens yang bisa berjalan.
 - [ ] Membuka QuotaLens lagi hanya memunculkan/focus window yang sudah ada.
 - [ ] Icon system tray muncul.
 - [ ] Menu tray Open QuotaLens menampilkan/focus window.
 - [ ] Menu tray Hide QuotaLens menyembunyikan window.
+- [ ] Tombol X window menyembunyikan app ke tray sesuai behavior saat ini.
 - [ ] Menu tray Quit benar-benar menutup aplikasi.
+- [ ] Setelah Quit, tidak ada proses `QuotaLens.exe` / Electron lama yang menggantung.
 
 ## Navigasi Dan Mode Normal
 
@@ -50,8 +53,16 @@ Gunakan checklist ini sebelum build QuotaLens dibagikan atau dirilis.
 - [ ] Pengaturan ukuran Mini Bar compact/normal/wide bekerja.
 - [ ] Pengaturan layout minimal/standard/detailed bekerja.
 - [ ] Pengaturan opacity Mini Bar bekerja.
+- [ ] Opacity hanya mengubah background Mini Bar, bukan teks/tombol/badge.
+- [ ] Warna custom Mini Bar bekerja untuk background, border, teks, tombol, dan badge status.
 - [ ] Toggle data Mini Bar menampilkan/menyembunyikan item sesuai pilihan.
+- [ ] Toggle tombol Mini Bar menampilkan/menyembunyikan ikon refresh, buka app, reset, dan hide.
+- [ ] Mode Gaming Mini Bar menyembunyikan tombol sampai hover jika setting aktif.
+- [ ] Opsi Abaikan klik mouse/click-through Mini Bar tidak mengganggu aplikasi di belakangnya.
+- [ ] Konfirmasi hide Mini Bar muncul jika setting konfirmasi aktif.
+- [ ] Reset Warna Mini Bar hanya mereset warna.
 - [ ] Reset Tampilan Mini Bar mengembalikan setting Mini Bar ke default.
+- [ ] Setting Mini Bar tersimpan setelah app ditutup dan dibuka ulang.
 
 ## Limit Dan Notification
 
@@ -86,6 +97,9 @@ Gunakan checklist ini sebelum build QuotaLens dibagikan atau dirilis.
 
 ## Pemakaian Kuota Per Aplikasi
 
+- [ ] Helper native SRUM ikut masuk packaged app di `resources/publish/`.
+- [ ] Packaged app bisa memanggil helper SRUM tanpa `dotnet run` manual.
+- [ ] Developer Mode menampilkan path helper SRUM, apakah helper ditemukan, stdout/stderr preview, dan resources path saat debug packaged app.
 - [ ] Filter periode Hari ini berjalan.
 - [ ] Filter periode 7 hari terakhir berjalan.
 - [ ] Filter periode 30 hari terakhir berjalan.
@@ -94,7 +108,22 @@ Gunakan checklist ini sebelum build QuotaLens dibagikan atau dirilis.
 - [ ] Data per aplikasi ditandai sebagai riwayat Windows SRUM, bukan sesi live QuotaLens.
 - [ ] Jika akses SRUM ditolak, panel menampilkan pesan butuh Administrator yang jelas.
 - [ ] QuotaLens tetap bisa dipakai normal tanpa Administrator.
+- [ ] Jika dijalankan sebagai Administrator, SRUM per-app usage bisa membaca data jika Windows mengizinkan.
 - [ ] Panel tidak memakai estimator atau jumlah koneksi sebagai angka MB/GB per aplikasi.
+- [ ] Refresh SRUM beberapa kali tidak membuat `%TEMP%\QuotaLens\srum` membengkak liar.
+
+## Storage Guard
+
+- [ ] Developer Mode menampilkan section Penyimpanan & Cache.
+- [ ] Storage Guard menampilkan path cache SRUM.
+- [ ] Storage Guard menampilkan ukuran cache SRUM.
+- [ ] Storage Guard menampilkan jumlah folder dan file cache.
+- [ ] Jika cache SRUM lebih dari 500 MB, warning batas aman tampil.
+- [ ] Tombol Segarkan Status Cache memperbarui status cache.
+- [ ] Tombol Bersihkan Cache SRUM meminta konfirmasi.
+- [ ] Bersihkan Cache SRUM hanya menghapus `%TEMP%\QuotaLens\srum`.
+- [ ] Bersihkan Cache SRUM tidak menghapus settings/history QuotaLens.
+- [ ] Bersihkan Cache SRUM tidak menghapus `C:\Windows\System32\sru\SRUDB.dat`.
 
 ## Developer Dan Diagnostics
 
@@ -114,6 +143,8 @@ Gunakan checklist ini sebelum build QuotaLens dibagikan atau dirilis.
 
 ## Output Build
 
+- [ ] `dotnet build native/per-app-usage-helper/QuotaLens.PerAppUsageHelper.csproj` berhasil.
+- [ ] `dotnet publish native/per-app-usage-helper/QuotaLens.PerAppUsageHelper.csproj -c Release -r win-x64 --self-contained false` berhasil.
 - [ ] `npm run package` berhasil.
 - [ ] Packaged app bisa dibuka dari `out/QuotaLens-win32-x64/QuotaLens.exe`.
 - [ ] `npm run make` berhasil.

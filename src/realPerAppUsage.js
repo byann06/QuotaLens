@@ -10,6 +10,9 @@ const defaultPeriod = '7d';
 const validPeriods = new Set(['today', '7d', '30d', 'all']);
 const lightweightUnsupportedReason =
   'Windows does not provide this through the lightweight commands currently used. This feature requires tracing methods or additional permissions.';
+const previewLimit = 4000;
+
+const toPreview = (value) => String(value || '').slice(0, previewLimit);
 
 const normalizePeriod = (period) => {
   const normalizedPeriod = String(period || defaultPeriod).trim().toLowerCase();
@@ -38,11 +41,23 @@ const parseHelperStdout = (stdout) => {
   try {
     return JSON.parse(stdout);
   } catch {
-    return null;
+    const text = String(stdout);
+    const startIndex = text.indexOf('{');
+    const endIndex = text.lastIndexOf('}');
+
+    if (startIndex === -1 || endIndex <= startIndex) {
+      return null;
+    }
+
+    try {
+      return JSON.parse(text.slice(startIndex, endIndex + 1));
+    } catch {
+      return null;
+    }
   }
 };
 
-const createUnsupportedResult = (reason = lightweightUnsupportedReason) => ({
+const createUnsupportedResult = (reason = lightweightUnsupportedReason, helperDebug = {}) => ({
   supported: false,
   sourceMethod,
   reason,
@@ -77,6 +92,15 @@ const createUnsupportedResult = (reason = lightweightUnsupportedReason) => ({
   periodEnd: '',
   isAdministrator: false,
   requiresAdministrator: requiresAdministratorFromReason(reason),
+  helperPath: helperDebug.helperPath || '',
+  helperExists: Boolean(helperDebug.helperExists),
+  helperExitCode: helperDebug.helperExitCode ?? null,
+  helperSpawnError: helperDebug.helperSpawnError || '',
+  helperStdoutPreview: helperDebug.helperStdoutPreview || '',
+  helperStderrPreview: helperDebug.helperStderrPreview || '',
+  appIsPackaged: Boolean(helperDebug.appIsPackaged),
+  processResourcesPath: helperDebug.processResourcesPath || '',
+  helperCwd: helperDebug.helperCwd || '',
   apps: [],
   collectedAt: new Date().toISOString(),
 });
@@ -168,6 +192,18 @@ const normalizeResult = (result = {}) => ({
         result.recoveryError,
       ].join(' '),
     ),
+  helperPath: result.helperPath ? String(result.helperPath) : '',
+  helperExists: Boolean(result.helperExists),
+  helperExitCode:
+    result.helperExitCode === null || result.helperExitCode === undefined
+      ? null
+      : Number(result.helperExitCode),
+  helperSpawnError: result.helperSpawnError ? String(result.helperSpawnError) : '',
+  helperStdoutPreview: result.helperStdoutPreview ? String(result.helperStdoutPreview) : '',
+  helperStderrPreview: result.helperStderrPreview ? String(result.helperStderrPreview) : '',
+  appIsPackaged: Boolean(result.appIsPackaged),
+  processResourcesPath: result.processResourcesPath ? String(result.processResourcesPath) : '',
+  helperCwd: result.helperCwd ? String(result.helperCwd) : '',
   tableNames: Array.isArray(result.tableNames) ? result.tableNames.map(String) : [],
   networkTableCandidates: Array.isArray(result.networkTableCandidates)
     ? result.networkTableCandidates.map(String)
@@ -187,37 +223,64 @@ const normalizeResult = (result = {}) => ({
   collectedAt: result.collectedAt || new Date().toISOString(),
 });
 
-const getHelperPathCandidates = (appPath) => [
-  path.join(
-    appPath,
-    'native',
-    'per-app-usage-helper',
-    'bin',
-    'Release',
-    'net8.0',
-    'QuotaLens.PerAppUsageHelper.exe',
-  ),
-  path.join(
-    appPath,
-    'native',
-    'per-app-usage-helper',
-    'bin',
-    'Debug',
-    'net8.0',
-    'QuotaLens.PerAppUsageHelper.exe',
-  ),
-];
+const getHelperPathCandidates = ({ appPath, resourcesPath }) =>
+  [
+    resourcesPath
+      ? path.join(
+          resourcesPath,
+          'publish',
+          'QuotaLens.PerAppUsageHelper.exe',
+        )
+      : '',
+    path.join(
+      appPath,
+      'native',
+      'per-app-usage-helper',
+      'bin',
+      'Release',
+      'net8.0',
+      'QuotaLens.PerAppUsageHelper.exe',
+    ),
+    path.join(
+      appPath,
+      'native',
+      'per-app-usage-helper',
+      'bin',
+      'Debug',
+      'net8.0',
+      'QuotaLens.PerAppUsageHelper.exe',
+    ),
+  ].filter(Boolean);
 
-export const getRealPerAppUsage = async ({ appPath, period = defaultPeriod }) => {
-  const helperPath = getHelperPathCandidates(appPath).find((candidatePath) =>
+export const getRealPerAppUsage = async ({
+  appPath,
+  resourcesPath = '',
+  appIsPackaged = false,
+  period = defaultPeriod,
+}) => {
+  const helperPath = getHelperPathCandidates({ appPath, resourcesPath }).find((candidatePath) =>
     existsSync(candidatePath),
   );
   const normalizedPeriod = normalizePeriod(period);
+  const helperDebug = {
+    helperPath: helperPath || '',
+    helperExists: Boolean(helperPath),
+    helperExitCode: null,
+    helperSpawnError: '',
+    helperStdoutPreview: '',
+    helperStderrPreview: '',
+    appIsPackaged,
+    processResourcesPath: resourcesPath || '',
+    helperCwd: helperPath ? path.dirname(helperPath) : appPath,
+  };
 
   if (!helperPath) {
     return {
       ...createUnsupportedResult(
-        'Native SRUM helper is not built yet. Real per-app byte counters require a built helper and SRUM parsing support.',
+        appIsPackaged
+          ? 'Helper SRUM tidak ditemukan di build aplikasi.'
+          : 'Native SRUM helper is not built yet. Real per-app byte counters require a built helper and SRUM parsing support.',
+        helperDebug,
       ),
       period: normalizedPeriod,
     };
@@ -234,16 +297,47 @@ export const getRealPerAppUsage = async ({ appPath, period = defaultPeriod }) =>
       timeout: 30000,
       windowsHide: true,
       maxBuffer: 1024 * 1024,
+      cwd: path.dirname(helperPath),
     });
-    const parsedResult = JSON.parse(stdout);
+    const parsedResult = parseHelperStdout(stdout);
 
-    return normalizeResult(parsedResult);
+    if (!parsedResult) {
+      return normalizeResult({
+        ...createUnsupportedResult('Native SRUM helper returned output that was not valid JSON.', {
+          ...helperDebug,
+          helperExitCode: 0,
+          helperStdoutPreview: toPreview(stdout),
+        }),
+        period: normalizedPeriod,
+      });
+    }
+
+    return normalizeResult({
+      ...parsedResult,
+      helperPath,
+      helperExists: true,
+      helperExitCode: 0,
+      helperStdoutPreview: toPreview(stdout),
+      appIsPackaged,
+      processResourcesPath: resourcesPath || '',
+      helperCwd: path.dirname(helperPath),
+    });
   } catch (error) {
     const parsedStdout = parseHelperStdout(error.stdout);
+    const exitCode = error.code ?? null;
+    const helperErrorDebug = {
+      ...helperDebug,
+      helperExitCode: typeof exitCode === 'number' ? exitCode : null,
+      helperSpawnError: error.message || '',
+      helperStdoutPreview: toPreview(error.stdout),
+      helperStderrPreview: toPreview(error.stderr),
+    };
 
     if (parsedStdout) {
       return normalizeResult({
         ...parsedStdout,
+        ...helperErrorDebug,
+        helperExists: true,
         period: parsedStdout.period || normalizedPeriod,
       });
     }
@@ -252,6 +346,7 @@ export const getRealPerAppUsage = async ({ appPath, period = defaultPeriod }) =>
     const requiresAdministrator = requiresAdministratorFromReason(errorMessage);
     const unsupportedResult = createUnsupportedResult(
       `Native per-app usage helper failed: ${errorMessage}`,
+      helperErrorDebug,
     );
 
     return {

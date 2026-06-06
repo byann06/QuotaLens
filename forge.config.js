@@ -5,10 +5,18 @@ const path = require('node:path');
 
 const appIconPath = path.resolve(__dirname, 'assets', 'app-icon.ico');
 const hasAppIcon = fs.existsSync(appIconPath);
+const perAppUsageHelperPublishPath = path.resolve(
+  __dirname,
+  'native/per-app-usage-helper/bin/Release/net8.0/win-x64/publish',
+);
 
 module.exports = {
   packagerConfig: {
     asar: true,
+    extraResource: [
+      'assets',
+      ...(fs.existsSync(perAppUsageHelperPublishPath) ? [perAppUsageHelperPublishPath] : []),
+    ],
     executableName: 'QuotaLens',
     name: 'QuotaLens',
     ...(hasAppIcon ? { icon: appIconPath } : {}),

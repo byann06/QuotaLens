@@ -1,6 +1,7 @@
 import { app, BrowserWindow, ipcMain, Menu, Notification, Tray, nativeImage, screen, shell } from 'electron';
 import { existsSync } from 'node:fs';
-import { writeFile } from 'node:fs/promises';
+import { readdir, rm, stat, writeFile } from 'node:fs/promises';
+import os from 'node:os';
 import path from 'node:path';
 import started from 'electron-squirrel-startup';
 import { getAppNetworkSuspects } from './appNetworkDetector';
@@ -58,20 +59,33 @@ const fallbackTrayIcon =
   'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAjElEQVR4Ae3VAQbAIAwEwLz/0+4lYRYErBgiILia2c1eDY0kSRJEeA/wnbt9A1ts5BhZA4T0q2DkczPUoZo1BOIP4A5gCNHByCk/0wDOPfIu7Ag+4ALHUQdoAAdYAbwO+JI88A4BdcANUoQnyQP/A7wCCrAigAcwmKrBLZJduJ+VJLtIKG0CRfTjQZIkSeJP9Qc3ayAhrko3iwAAAABJRU5ErkJggg==';
 
 const getTrayIcon = () => {
-  const trayIconPath = path.join(app.getAppPath(), 'assets', 'tray-icon.png');
+  const candidatePaths = [
+    path.join(process.resourcesPath || '', 'assets', 'tray-icon.ico'),
+    path.join(process.resourcesPath || '', 'assets', 'tray-icon.png'),
+    path.join(app.getAppPath(), 'assets', 'tray-icon.ico'),
+    path.join(app.getAppPath(), 'assets', 'tray-icon.png'),
+    path.join(__dirname, '..', 'assets', 'tray-icon.ico'),
+    path.join(__dirname, '..', 'assets', 'tray-icon.png'),
+  ];
 
-  if (existsSync(trayIconPath)) {
+  for (const trayIconPath of candidatePaths) {
+    if (!trayIconPath || !existsSync(trayIconPath)) {
+      continue;
+    }
+
     const icon = nativeImage.createFromPath(trayIconPath);
 
     if (!icon.isEmpty()) {
-      return icon;
+      return icon.resize({
+        width: 16,
+        height: 16,
+      });
     }
 
     console.warn(`QuotaLens tray icon is empty: ${trayIconPath}`);
-  } else {
-    console.warn(`QuotaLens tray icon not found: ${trayIconPath}`);
   }
 
+  console.warn('QuotaLens tray icon not found in candidate paths:', candidatePaths);
   return nativeImage.createFromDataURL(fallbackTrayIcon);
 };
 
@@ -178,6 +192,9 @@ const applyMiniBarSettings = (settings) => {
     isApplyingMiniBarBounds = false;
   }, 100);
   miniBarWindow.setAlwaysOnTop(Boolean(settings.miniBarAlwaysOnTop), 'floating');
+  miniBarWindow.setIgnoreMouseEvents(Boolean(settings.miniBarClickThrough), {
+    forward: true,
+  });
 
   if (typeof miniBarWindow.setMovable === 'function') {
     miniBarWindow.setMovable(!settings.miniBarLockPosition);
@@ -191,6 +208,7 @@ const shouldApplyMiniBarWindowSettings = (previousSettings, nextSettings) =>
     'miniBarSize',
     'miniBarPosition',
     'miniBarLockPosition',
+    'miniBarClickThrough',
   ].some((key) => previousSettings?.[key] !== nextSettings?.[key]);
 
 const showMiniBarWindow = async () => {
@@ -447,12 +465,141 @@ const runProbe = async (probe) => {
   }
 };
 
+const formatBytes = (bytes) => {
+  const safeBytes = Number.isFinite(bytes) ? bytes : 0;
+  const units = ['B', 'KB', 'MB', 'GB'];
+  let value = safeBytes;
+  let unitIndex = 0;
+
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024;
+    unitIndex += 1;
+  }
+
+  return `${value.toFixed(unitIndex === 0 ? 0 : 2)} ${units[unitIndex]}`;
+};
+
+const getSrumCachePath = () => path.join(os.tmpdir(), 'QuotaLens', 'srum');
+
+const isSafeSrumCachePath = (targetPath) => {
+  const normalizedTarget = path.resolve(targetPath);
+  const normalizedExpected = path.resolve(getSrumCachePath());
+  const lowerTarget = normalizedTarget.toLowerCase();
+
+  return (
+    normalizedTarget === normalizedExpected &&
+    lowerTarget.includes(`${path.sep.toLowerCase()}temp${path.sep.toLowerCase()}`) &&
+    lowerTarget.endsWith(`${path.sep.toLowerCase()}quotalens${path.sep.toLowerCase()}srum`)
+  );
+};
+
+const scanFolder = async (folderPath) => {
+  let bytes = 0;
+  let folderCount = 0;
+  let fileCount = 0;
+
+  const scan = async (currentPath) => {
+    let entries = [];
+
+    try {
+      entries = await readdir(currentPath, { withFileTypes: true });
+    } catch {
+      return;
+    }
+
+    await Promise.all(
+      entries.map(async (entry) => {
+        const entryPath = path.join(currentPath, entry.name);
+
+        try {
+          if (entry.isDirectory()) {
+            folderCount += 1;
+            await scan(entryPath);
+            return;
+          }
+
+          if (entry.isFile()) {
+            const info = await stat(entryPath);
+            bytes += info.size;
+            fileCount += 1;
+          }
+        } catch {
+          // Locked temp files should not break storage status.
+        }
+      }),
+    );
+  };
+
+  await scan(folderPath);
+
+  return { bytes, folderCount, fileCount };
+};
+
+const getStorageStatus = async () => {
+  const tempQuotaLensPath = path.join(os.tmpdir(), 'QuotaLens');
+  const srumCachePath = getSrumCachePath();
+  const srumCacheExists = existsSync(srumCachePath);
+  const scan = srumCacheExists
+    ? await scanFolder(srumCachePath)
+    : { bytes: 0, folderCount: 0, fileCount: 0 };
+
+  return {
+    tempQuotaLensPath,
+    srumCachePath,
+    srumCacheExists,
+    srumCacheBytes: scan.bytes,
+    srumCacheFormatted: formatBytes(scan.bytes),
+    srumCacheFolderCount: scan.folderCount,
+    srumCacheFileCount: scan.fileCount,
+    lastCheckedAt: new Date().toISOString(),
+  };
+};
+
+const clearSrumCache = async () => {
+  const srumCachePath = getSrumCachePath();
+
+  if (!isSafeSrumCachePath(srumCachePath)) {
+    return {
+      success: false,
+      deletedBytes: 0,
+      deletedFolders: 0,
+      deletedFiles: 0,
+      error: 'Safety check failed. Refusing to delete outside Temp\\QuotaLens\\srum.',
+    };
+  }
+
+  const before = existsSync(srumCachePath)
+    ? await scanFolder(srumCachePath)
+    : { bytes: 0, folderCount: 0, fileCount: 0 };
+
+  try {
+    await rm(srumCachePath, { recursive: true, force: true });
+
+    return {
+      success: true,
+      deletedBytes: before.bytes,
+      deletedFolders: before.folderCount,
+      deletedFiles: before.fileCount,
+      error: '',
+    };
+  } catch (error) {
+    return {
+      success: false,
+      deletedBytes: 0,
+      deletedFolders: 0,
+      deletedFiles: 0,
+      error: error.message || 'Failed to clear SRUM cache.',
+    };
+  }
+};
+
 const buildDiagnostics = async () => {
-  const [settings, history, networkProbe, wifiProbe] = await Promise.all([
+  const [settings, history, networkProbe, wifiProbe, storageStatus] = await Promise.all([
     readSettings(),
     getHistory(),
     runProbe(getNetworkStats),
     runProbe(getWifiInfo),
+    getStorageStatus(),
   ]);
 
   return {
@@ -467,6 +614,7 @@ const buildDiagnostics = async () => {
     networkProbe,
     wifiProbe,
     settingsSummary: summarizeSettings(settings),
+    storageStatus,
     historyCount: history.length,
     timestamp: new Date().toISOString(),
   };
@@ -873,6 +1021,8 @@ app.whenReady().then(async () => {
     try {
       const perAppUsage = await getRealPerAppUsage({
         appPath: app.getAppPath(),
+        resourcesPath: process.resourcesPath,
+        appIsPackaged: app.isPackaged,
         period: options?.period,
       });
 
@@ -893,6 +1043,30 @@ app.whenReady().then(async () => {
       return {
         ok: false,
         error: error.message || 'Failed to build diagnostics.',
+      };
+    }
+  });
+
+  ipcMain.handle('quotalens:get-storage-status', async () => {
+    try {
+      const storageStatus = await getStorageStatus();
+      return { ok: true, storageStatus };
+    } catch (error) {
+      return {
+        ok: false,
+        error: error.message || 'Failed to read storage status.',
+      };
+    }
+  });
+
+  ipcMain.handle('quotalens:clear-srum-cache', async () => {
+    try {
+      const result = await clearSrumCache();
+      return { ok: true, result };
+    } catch (error) {
+      return {
+        ok: false,
+        error: error.message || 'Failed to clear SRUM cache.',
       };
     }
   });

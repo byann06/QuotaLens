@@ -36,6 +36,18 @@ out/QuotaLens-win32-x64/QuotaLens.exe
 
 Packaged app ini adalah aplikasi desktop yang bisa dibuka langsung tanpa `npm start`.
 
+Helper native SRUM untuk fitur `Pemakaian Kuota per Aplikasi` ikut disalin ke packaged app sebagai resource:
+
+```text
+out/QuotaLens-win32-x64/resources/publish/
+```
+
+App final tidak memakai `dotnet run` manual. Saat membuat build, pastikan helper sudah berhasil dipublish sebelum menjalankan package/make:
+
+```bash
+dotnet publish native/per-app-usage-helper/QuotaLens.PerAppUsageHelper.csproj -c Release -r win-x64 --self-contained false
+```
+
 Jika proses package gagal karena file di folder `out` atau `.vite` sedang dipakai, tutup QuotaLens yang sedang berjalan terlebih dahulu, termasuk dari menu tray `Quit`, lalu jalankan ulang `npm run package`.
 
 ## Membuat Shortcut Desktop
@@ -72,7 +84,7 @@ Jika tidak dijalankan sebagai Administrator dan SRUM ditolak, QuotaLens tidak se
 
 Mini Bar dibuat sebagai overlay kecil untuk memantau kuota tanpa membuka window utama. Mini Bar bersifat frameless, always-on-top jika setting aktif, dan bisa disembunyikan tanpa menutup QuotaLens.
 
-Pengaturan Mini Bar ada di halaman `Pengaturan > Tampilan > Mini Bar`, termasuk ukuran, layout, posisi, opacity, lock posisi, data yang ditampilkan, dan tombol ikon yang tersedia.
+Pengaturan Mini Bar ada di halaman `Mini Bar`, termasuk ukuran, layout, posisi, opacity, mode gaming, click-through, lock posisi, data yang ditampilkan, dan tombol ikon yang tersedia.
 
 Developer Mode bisa diaktifkan dari halaman Pengaturan. Saat Developer Mode mati, detail teknis seperti diagnostics, path file, status parser SRUM, status copy/recovery, koneksi aktif per proses, dan estimator tidak ditampilkan di mode normal.
 

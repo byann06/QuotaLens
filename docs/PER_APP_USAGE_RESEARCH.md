@@ -1044,6 +1044,39 @@ Jika QuotaLens sedang tertutup, aman untuk menghapus folder berikut secara manua
 %TEMP%\QuotaLens\srum
 ```
 
+## Packaged Helper Debug Tahap 20A
+
+Tahap 20A memperkuat audit runtime packaged app. Helper SRUM harus ikut masuk build Electron Forge sebagai resource:
+
+```text
+out\QuotaLens-win32-x64\resources\publish\QuotaLens.PerAppUsageHelper.exe
+```
+
+Electron memanggil helper dari `process.resourcesPath\publish\QuotaLens.PerAppUsageHelper.exe` saat app sudah dipackage. Di mode development, fallback tetap mencari output build helper di folder `native\per-app-usage-helper\bin\...`.
+
+Jika panel SRUM gagal pada app packaged, QuotaLens menampilkan detail debug hanya saat Developer Mode aktif:
+
+- path helper yang dipakai
+- apakah helper ditemukan
+- exit code helper
+- preview stdout/stderr helper
+- `process.resourcesPath`
+- working directory helper
+- status copy/recovery/cleanup SRUM
+
+Detail ini dipakai untuk membedakan masalah permission Administrator, helper tidak ikut package, runtime .NET tidak tersedia, atau output helper bukan JSON valid. QuotaLens tetap tidak boleh mengarang angka MB/GB per aplikasi jika helper gagal.
+
+## Mini Bar Gaming UX Tahap 20A
+
+Mini Bar tetap menjadi overlay ringan untuk memantau kuota. Tahap 20A menambahkan opsi UX untuk mengurangi salah klik saat gaming:
+
+- Mode Gaming
+- sembunyikan tombol sampai hover
+- konfirmasi sebelum menyembunyikan Mini Bar
+- click-through agar klik mouse diteruskan ke aplikasi di belakang Mini Bar
+
+Perubahan ini hanya mengatur perilaku UI Mini Bar. Parser SRUM, angka pemakaian, dan monitoring inti tidak berubah.
+
 ## Rekomendasi Berikutnya
 
 1. Validasi angka SRUM dengan pembanding Windows Settings > Network & Internet > Data usage.

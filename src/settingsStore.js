@@ -12,6 +12,10 @@ export const miniBarDefaultSettings = {
   miniBarLayout: 'standard',
   miniBarPosition: 'top-right',
   miniBarLockPosition: false,
+  miniBarGamingMode: false,
+  miniBarClickThrough: false,
+  miniBarHideButtonsUntilHover: true,
+  miniBarConfirmHide: true,
   miniBarShowSsid: true,
   miniBarShowTodayUsage: true,
   miniBarShowSessionUsage: true,
@@ -216,6 +220,22 @@ const normalizeSettings = (settings = {}) => ({
     typeof settings.miniBarLockPosition === 'boolean'
       ? settings.miniBarLockPosition
       : defaultSettings.miniBarLockPosition,
+  miniBarGamingMode:
+    typeof settings.miniBarGamingMode === 'boolean'
+      ? settings.miniBarGamingMode
+      : defaultSettings.miniBarGamingMode,
+  miniBarClickThrough:
+    typeof settings.miniBarClickThrough === 'boolean'
+      ? settings.miniBarClickThrough
+      : defaultSettings.miniBarClickThrough,
+  miniBarHideButtonsUntilHover:
+    typeof settings.miniBarHideButtonsUntilHover === 'boolean'
+      ? settings.miniBarHideButtonsUntilHover
+      : defaultSettings.miniBarHideButtonsUntilHover,
+  miniBarConfirmHide:
+    typeof settings.miniBarConfirmHide === 'boolean'
+      ? settings.miniBarConfirmHide
+      : defaultSettings.miniBarConfirmHide,
   miniBarShowSsid:
     typeof settings.miniBarShowSsid === 'boolean'
       ? settings.miniBarShowSsid

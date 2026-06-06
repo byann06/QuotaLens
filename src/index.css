@@ -723,6 +723,10 @@ h1 {
   color: #fecaca !important;
 }
 
+.warning-text {
+  color: #fde68a !important;
+}
+
 .mini-settings-card small,
 .compact-note {
   color: #64748b;
@@ -1894,4 +1898,46 @@ body.mini-mode[data-mini-size='wide'] .mini-top-app {
 .mini-icon-button.danger {
   border-color: var(--mini-bar-danger-color);
   color: var(--mini-bar-danger-color);
+}
+
+body.mini-mode.mini-gaming-mode .mini-bar-panel {
+  cursor: grab;
+}
+
+body.mini-mode.mini-gaming-mode .mini-bar-panel:active {
+  cursor: grabbing;
+}
+
+body.mini-mode.mini-gaming-mode.mini-hide-actions-until-hover .mini-actions {
+  width: 0;
+  max-width: 0;
+  opacity: 0;
+  overflow: hidden;
+  pointer-events: none;
+  transform: translateX(4px);
+  transition:
+    opacity 120ms ease,
+    max-width 120ms ease,
+    width 120ms ease,
+    transform 120ms ease;
+}
+
+body.mini-mode.mini-gaming-mode.mini-hide-actions-until-hover .mini-bar-panel:hover .mini-actions {
+  width: auto;
+  max-width: 112px;
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(0);
+}
+
+body.mini-mode.mini-click-through .mini-bar-panel {
+  pointer-events: none;
+}
+
+.mini-preview-bar.mini-gaming-mode.mini-hide-actions-until-hover .mini-preview-actions {
+  opacity: 0.2;
+}
+
+.mini-preview-bar.mini-gaming-mode.mini-hide-actions-until-hover:hover .mini-preview-actions {
+  opacity: 1;
 }

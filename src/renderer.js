@@ -23,6 +23,10 @@ const fallbackSettings = {
   miniBarLayout: 'standard',
   miniBarPosition: 'top-right',
   miniBarLockPosition: false,
+  miniBarGamingMode: false,
+  miniBarClickThrough: false,
+  miniBarHideButtonsUntilHover: true,
+  miniBarConfirmHide: true,
   miniBarShowSsid: true,
   miniBarShowTodayUsage: true,
   miniBarShowSessionUsage: true,
@@ -752,6 +756,29 @@ app.innerHTML = `
           </label>
         </article>
 
+        <article class="mini-settings-card">
+          <p class="settings-group-title" data-i18n="miniBar.sectionGaming">Mode Gaming</p>
+          <label class="toggle-control">
+            <input id="miniBarGamingModeInput" type="checkbox" />
+            <span data-i18n="settings.miniBarGamingMode">Mode Gaming</span>
+          </label>
+          <label class="toggle-control">
+            <input id="miniBarHideButtonsUntilHoverInput" type="checkbox" />
+            <span data-i18n="settings.miniBarHideButtonsUntilHover">Sembunyikan tombol sampai hover</span>
+          </label>
+          <label class="toggle-control">
+            <input id="miniBarConfirmHideInput" type="checkbox" />
+            <span data-i18n="settings.miniBarConfirmHide">Konfirmasi sebelum sembunyikan</span>
+          </label>
+          <label class="toggle-control">
+            <input id="miniBarClickThroughInput" type="checkbox" />
+            <span data-i18n="settings.miniBarClickThrough">Abaikan klik mouse</span>
+          </label>
+          <small class="compact-note" data-i18n="miniBar.gamingModeHelp">
+            Mode ini mengurangi salah klik saat gaming. Jika abaikan klik aktif, klik akan diteruskan ke aplikasi di belakang Mini Bar.
+          </small>
+        </article>
+
         <article class="mini-settings-card mini-colors-card">
           <p class="settings-group-title" data-i18n="miniBar.sectionColors">Warna Mini Bar</p>
           <div class="mini-color-grid">
@@ -916,6 +943,42 @@ app.innerHTML = `
       </div>
       <p class="settings-note" data-i18n="diagnostics.notRefreshed" id="diagnosticsNote">Diagnostik belum disegarkan.</p>
     </section>
+
+    <section class="settings-panel developer-only" data-page="developer">
+      <div class="settings-header">
+        <div>
+          <p class="section-label" data-i18n="storage.title">Penyimpanan & Cache</p>
+          <h3 data-i18n="storage.srumCache">Cache SRUM</h3>
+        </div>
+        <div class="diagnostics-actions">
+          <button class="secondary-button" data-i18n="button.refreshCacheStatus" id="refreshStorageStatusButton" type="button">Segarkan Status Cache</button>
+          <button class="danger-button" data-i18n="button.clearSrumCache" id="clearSrumCacheButton" type="button">Bersihkan Cache SRUM</button>
+        </div>
+      </div>
+      <div class="diagnostics-grid">
+        <div class="diagnostics-wide">
+          <span data-i18n="storage.srumCachePath">Path Cache SRUM</span>
+          <strong id="storageSrumCachePath">-</strong>
+        </div>
+        <div>
+          <span data-i18n="storage.cacheSize">Ukuran Cache</span>
+          <strong id="storageSrumCacheSize">-</strong>
+        </div>
+        <div>
+          <span data-i18n="storage.folderCount">Jumlah Folder</span>
+          <strong id="storageSrumFolderCount">-</strong>
+        </div>
+        <div>
+          <span data-i18n="storage.fileCount">Jumlah File</span>
+          <strong id="storageSrumFileCount">-</strong>
+        </div>
+        <div>
+          <span data-i18n="storage.lastChecked">Terakhir Dicek</span>
+          <strong id="storageLastChecked">-</strong>
+        </div>
+      </div>
+      <p class="settings-note" id="storageNote" data-i18n="storage.notChecked">Status cache belum dicek.</p>
+    </section>
     </main>
   </section>
 `;
@@ -973,11 +1036,15 @@ const elements = {
   miniBarColorPickers: document.querySelectorAll('[data-mini-color-picker]'),
   miniBarColorTexts: document.querySelectorAll('[data-mini-color-text]'),
   miniBarEnabledInput: document.querySelector('#miniBarEnabledInput'),
+  miniBarGamingModeInput: document.querySelector('#miniBarGamingModeInput'),
   miniBrand: document.querySelector('#miniBrand'),
   miniDot: document.querySelector('#miniDot'),
   miniBarLayoutSelect: document.querySelector('#miniBarLayoutSelect'),
   miniBarLayoutStatus: document.querySelector('#miniBarLayoutStatus'),
   miniBarLockPositionInput: document.querySelector('#miniBarLockPositionInput'),
+  miniBarClickThroughInput: document.querySelector('#miniBarClickThroughInput'),
+  miniBarConfirmHideInput: document.querySelector('#miniBarConfirmHideInput'),
+  miniBarHideButtonsUntilHoverInput: document.querySelector('#miniBarHideButtonsUntilHoverInput'),
   miniBarOpacityInput: document.querySelector('#miniBarOpacityInput'),
   miniBarOpacityLabel: document.querySelector('#miniBarOpacityLabel'),
   miniBarOpacityValue: document.querySelector('#miniBarOpacityValue'),
@@ -1030,6 +1097,7 @@ const elements = {
   realPerAppUsageReason: document.querySelector('#realPerAppUsageReason'),
   realPerAppUsageSource: document.querySelector('#realPerAppUsageSource'),
   realPerAppUsageStatus: document.querySelector('#realPerAppUsageStatus'),
+  refreshStorageStatusButton: document.querySelector('#refreshStorageStatusButton'),
   openDataFolderButton: document.querySelector('#openDataFolderButton'),
   refreshDiagnosticsButton: document.querySelector('#refreshDiagnosticsButton'),
   refreshEstimatesButton: document.querySelector('#refreshEstimatesButton'),
@@ -1046,6 +1114,13 @@ const elements = {
   settingsNote: document.querySelector('#settingsNote'),
   startMinimizedInput: document.querySelector('#startMinimizedInput'),
   startupNote: document.querySelector('#startupNote'),
+  storageLastChecked: document.querySelector('#storageLastChecked'),
+  storageNote: document.querySelector('#storageNote'),
+  storageSrumCachePath: document.querySelector('#storageSrumCachePath'),
+  storageSrumCacheSize: document.querySelector('#storageSrumCacheSize'),
+  storageSrumFileCount: document.querySelector('#storageSrumFileCount'),
+  storageSrumFolderCount: document.querySelector('#storageSrumFolderCount'),
+  clearSrumCacheButton: document.querySelector('#clearSrumCacheButton'),
   startedAt: document.querySelector('#startedAt'),
   statusPill: document.querySelector('#statusPill'),
   statusText: document.querySelector('#statusText'),
@@ -1265,6 +1340,11 @@ const renderMiniBarPreview = () => {
 
   elements.miniBarPreview.dataset.miniSize = settings.miniBarSize || 'normal';
   elements.miniBarPreview.dataset.miniLayout = settings.miniBarLayout || 'standard';
+  elements.miniBarPreview.classList.toggle('mini-gaming-mode', Boolean(settings.miniBarGamingMode));
+  elements.miniBarPreview.classList.toggle(
+    'mini-hide-actions-until-hover',
+    Boolean(settings.miniBarGamingMode && settings.miniBarHideButtonsUntilHover),
+  );
   elements.miniBarPreview.style.setProperty(
     '--mini-bar-bg-opacity',
     String(normalizeOpacityInput(settings.miniBarOpacity)),
@@ -1350,6 +1430,12 @@ const applyMiniBarUiSettings = () => {
   document.body.dataset.miniLayout = layout;
   document.body.classList.toggle('mini-empty', dataCount === 0 && actionCount === 0);
   document.body.classList.toggle('mini-position-locked', Boolean(settings.miniBarLockPosition));
+  document.body.classList.toggle('mini-gaming-mode', Boolean(settings.miniBarGamingMode));
+  document.body.classList.toggle(
+    'mini-hide-actions-until-hover',
+    Boolean(settings.miniBarGamingMode && settings.miniBarHideButtonsUntilHover),
+  );
+  document.body.classList.toggle('mini-click-through', Boolean(settings.miniBarClickThrough));
 
   setElementVisible(elements.miniBrand, visibleParts.brand);
   setElementVisible(elements.miniDot, visibleParts.brand && dataCount > 0);
@@ -1634,6 +1720,23 @@ const renderSettings = (settings) => {
     elements.miniBarLockPositionInput.checked = currentSettings.miniBarLockPosition;
   }
 
+  if (document.activeElement !== elements.miniBarGamingModeInput) {
+    elements.miniBarGamingModeInput.checked = currentSettings.miniBarGamingMode;
+  }
+
+  if (document.activeElement !== elements.miniBarHideButtonsUntilHoverInput) {
+    elements.miniBarHideButtonsUntilHoverInput.checked =
+      currentSettings.miniBarHideButtonsUntilHover;
+  }
+
+  if (document.activeElement !== elements.miniBarConfirmHideInput) {
+    elements.miniBarConfirmHideInput.checked = currentSettings.miniBarConfirmHide;
+  }
+
+  if (document.activeElement !== elements.miniBarClickThroughInput) {
+    elements.miniBarClickThroughInput.checked = currentSettings.miniBarClickThrough;
+  }
+
   if (document.activeElement !== elements.miniBarShowSsidInput) {
     elements.miniBarShowSsidInput.checked = currentSettings.miniBarShowSsid;
   }
@@ -1705,10 +1808,20 @@ const setDiagnosticsLoading = (isLoading, action = 'refresh') => {
   elements.refreshDiagnosticsButton.disabled = isLoading;
   elements.openDataFolderButton.disabled = isLoading;
   elements.exportDiagnosticsButton.disabled = isLoading;
+  elements.refreshStorageStatusButton.disabled = isLoading;
+  elements.clearSrumCacheButton.disabled = isLoading;
   elements.refreshDiagnosticsButton.textContent =
     isLoading && action === 'refresh' ? t('button.refreshing') : t('button.refreshDiagnostics');
   elements.exportDiagnosticsButton.textContent =
     isLoading && action === 'export' ? t('button.exporting') : t('button.exportDiagnostics');
+  elements.refreshStorageStatusButton.textContent =
+    isLoading && action === 'storage'
+      ? t('button.refreshing')
+      : t('button.refreshCacheStatus');
+  elements.clearSrumCacheButton.textContent =
+    isLoading && action === 'clear-storage'
+      ? t('button.clearing')
+      : t('button.clearSrumCache');
 };
 
 const renderDiagnostics = (diagnostics) => {
@@ -1735,6 +1848,27 @@ const renderDiagnostics = (diagnostics) => {
   elements.diagnosticsNote.textContent = tf('diagnostics.lastRefresh', {
     time: formatDateTime(diagnostics.timestamp),
   });
+
+  if (diagnostics.storageStatus) {
+    renderStorageStatus(diagnostics.storageStatus);
+  }
+};
+
+const renderStorageStatus = (storageStatus) => {
+  const safeLimitBytes = 500 * 1024 * 1024;
+  const cacheBytes = Number(storageStatus?.srumCacheBytes || 0);
+
+  elements.storageSrumCachePath.textContent = storageStatus?.srumCachePath || '-';
+  elements.storageSrumCacheSize.textContent =
+    storageStatus?.srumCacheFormatted || formatUsage(cacheBytes);
+  elements.storageSrumFolderCount.textContent = formatInteger(
+    storageStatus?.srumCacheFolderCount || 0,
+  );
+  elements.storageSrumFileCount.textContent = formatInteger(storageStatus?.srumCacheFileCount || 0);
+  elements.storageLastChecked.textContent = formatDateTime(storageStatus?.lastCheckedAt);
+  elements.storageNote.textContent =
+    cacheBytes > safeLimitBytes ? t('storage.warningLarge') : t('storage.safe');
+  elements.storageNote.classList.toggle('warning-text', cacheBytes > safeLimitBytes);
 };
 
 const refreshDiagnostics = async () => {
@@ -1758,6 +1892,69 @@ const refreshDiagnostics = async () => {
     renderDiagnostics(result.diagnostics);
   } catch (error) {
     elements.diagnosticsNote.textContent = error.message || t('diagnostics.refreshFailed');
+  } finally {
+    setDiagnosticsLoading(false);
+  }
+};
+
+const refreshStorageStatus = async () => {
+  if (isDiagnosticsLoading) {
+    return;
+  }
+
+  if (!ensureApi('getStorageStatus')) {
+    return;
+  }
+
+  setDiagnosticsLoading(true, 'storage');
+
+  try {
+    const result = await window.quotaLens.getStorageStatus();
+
+    if (!result.ok) {
+      throw new Error(result.error);
+    }
+
+    renderStorageStatus(result.storageStatus);
+  } catch (error) {
+    elements.storageNote.textContent = error.message || t('storage.refreshFailed');
+  } finally {
+    setDiagnosticsLoading(false);
+  }
+};
+
+const clearSrumCache = async () => {
+  if (isDiagnosticsLoading) {
+    return;
+  }
+
+  if (!ensureApi('clearSrumCache')) {
+    return;
+  }
+
+  if (!window.confirm(t('storage.clearConfirm'))) {
+    return;
+  }
+
+  setDiagnosticsLoading(true, 'clear-storage');
+
+  try {
+    const result = await window.quotaLens.clearSrumCache();
+
+    if (!result.ok) {
+      throw new Error(result.error);
+    }
+
+    if (!result.result.success) {
+      throw new Error(result.result.error || t('storage.clearFailed'));
+    }
+
+    elements.storageNote.textContent = t('storage.clearSuccess');
+    setDiagnosticsLoading(false);
+    await refreshStorageStatus();
+    elements.storageNote.textContent = t('storage.clearSuccess');
+  } catch (error) {
+    elements.storageNote.textContent = error.message || t('storage.clearFailed');
   } finally {
     setDiagnosticsLoading(false);
   }
@@ -1821,6 +2018,10 @@ const collectSettingsFromInputs = (overrides = {}) => ({
   miniBarLayout: elements.miniBarLayoutSelect.value,
   miniBarPosition: elements.miniBarPositionSelect.value,
   miniBarLockPosition: elements.miniBarLockPositionInput.checked,
+  miniBarGamingMode: elements.miniBarGamingModeInput.checked,
+  miniBarClickThrough: elements.miniBarClickThroughInput.checked,
+  miniBarHideButtonsUntilHover: elements.miniBarHideButtonsUntilHoverInput.checked,
+  miniBarConfirmHide: elements.miniBarConfirmHideInput.checked,
   miniBarShowSsid: elements.miniBarShowSsidInput.checked,
   miniBarShowTodayUsage: elements.miniBarShowTodayUsageInput.checked,
   miniBarShowSessionUsage: elements.miniBarShowSessionUsageInput.checked,
@@ -1854,6 +2055,10 @@ const collectMiniBarSettingsFromInputs = (overrides = {}) => ({
   miniBarLayout: elements.miniBarLayoutSelect.value,
   miniBarPosition: elements.miniBarPositionSelect.value,
   miniBarLockPosition: elements.miniBarLockPositionInput.checked,
+  miniBarGamingMode: elements.miniBarGamingModeInput.checked,
+  miniBarClickThrough: elements.miniBarClickThroughInput.checked,
+  miniBarHideButtonsUntilHover: elements.miniBarHideButtonsUntilHoverInput.checked,
+  miniBarConfirmHide: elements.miniBarConfirmHideInput.checked,
   miniBarShowSsid: elements.miniBarShowSsidInput.checked,
   miniBarShowTodayUsage: elements.miniBarShowTodayUsageInput.checked,
   miniBarShowSessionUsage: elements.miniBarShowSessionUsageInput.checked,
@@ -2332,6 +2537,28 @@ const renderRealPerAppUsage = (perAppUsage) => {
       : '',
     perAppUsage?.esentutlOutputPreview
       ? `${t('perApp.esentutlOutputPreview')}: ${perAppUsage.esentutlOutputPreview}`
+      : '',
+    `${t('perApp.appIsPackaged')}: ${perAppUsage?.appIsPackaged ? 'true' : 'false'}`,
+    perAppUsage?.helperPath ? `${t('perApp.helperPath')}: ${perAppUsage.helperPath}` : '',
+    `${t('perApp.helperExists')}: ${perAppUsage?.helperExists ? 'true' : 'false'}`,
+    perAppUsage?.helperExitCode !== null && perAppUsage?.helperExitCode !== undefined
+      ? `${t('perApp.helperExitCode')}: ${perAppUsage.helperExitCode}`
+      : '',
+    perAppUsage?.helperSpawnError
+      ? `${t('perApp.helperSpawnError')}: ${perAppUsage.helperSpawnError}`
+      : '',
+    perAppUsage?.processResourcesPath
+      ? `${t('perApp.processResourcesPath')}: ${perAppUsage.processResourcesPath}`
+      : '',
+    perAppUsage?.helperCwd ? `${t('perApp.helperCwd')}: ${perAppUsage.helperCwd}` : '',
+    perAppUsage?.tempCleanupStatus
+      ? `${t('perApp.tempCleanupStatus')}: ${perAppUsage.tempCleanupStatus}`
+      : '',
+    perAppUsage?.helperStdoutPreview
+      ? `${t('perApp.helperStdoutPreview')}: ${perAppUsage.helperStdoutPreview}`
+      : '',
+    perAppUsage?.helperStderrPreview
+      ? `${t('perApp.helperStderrPreview')}: ${perAppUsage.helperStderrPreview}`
       : '',
   ].filter(Boolean);
 
@@ -3237,6 +3464,14 @@ const hideMiniBar = async () => {
     return;
   }
 
+  if (
+    isMiniBarWindow &&
+    currentSettings.miniBarConfirmHide &&
+    !window.confirm(t('mini.confirmHide'))
+  ) {
+    return;
+  }
+
   try {
     await window.quotaLens.hideMiniBar();
   } catch (error) {
@@ -3556,6 +3791,7 @@ elements.navButtons.forEach((button) => {
 
     if (activePage === 'developer') {
       refreshDiagnostics();
+      refreshStorageStatus();
       refreshAppUsageEstimates();
       refreshAppSuspects();
     }
@@ -3578,6 +3814,8 @@ elements.resetButton.addEventListener('click', resetSession);
 elements.clearChartButton.addEventListener('click', clearChartData);
 elements.clearHistoryButton.addEventListener('click', clearHistory);
 elements.refreshDiagnosticsButton.addEventListener('click', refreshDiagnostics);
+elements.refreshStorageStatusButton.addEventListener('click', refreshStorageStatus);
+elements.clearSrumCacheButton.addEventListener('click', clearSrumCache);
 elements.openDataFolderButton.addEventListener('click', openDataFolder);
 elements.exportDiagnosticsButton.addEventListener('click', exportDiagnostics);
 elements.saveSettingsButton.addEventListener('click', saveSettings);
@@ -3605,6 +3843,10 @@ elements.miniBarColorTexts.forEach((input) => {
   elements.miniBarLayoutSelect,
   elements.miniBarPositionSelect,
   elements.miniBarLockPositionInput,
+  elements.miniBarGamingModeInput,
+  elements.miniBarHideButtonsUntilHoverInput,
+  elements.miniBarConfirmHideInput,
+  elements.miniBarClickThroughInput,
   elements.miniBarShowSsidInput,
   elements.miniBarShowTodayUsageInput,
   elements.miniBarShowSessionUsageInput,

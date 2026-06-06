@@ -32,7 +32,7 @@ QuotaLens menyediakan dashboard sederhana untuk memantau hal-hal tersebut dengan
 - Navigasi halaman agar dashboard, pemakaian aplikasi, riwayat, pengaturan, dan developer tools tidak bercampur dalam satu layar.
 - Developer Mode untuk menampilkan diagnostics, health check, dan detail teknis SRUM hanya saat dibutuhkan.
 - Mini Bar always-on-top untuk memantau kuota saat bermain game atau membuka aplikasi lain.
-- Mini Bar Customization untuk mengatur ukuran, layout, posisi, opacity, data yang tampil, dan tombol yang tersedia.
+- Mini Bar Customization untuk mengatur ukuran, layout, posisi, opacity background, mode gaming, data yang tampil, dan tombol yang tersedia.
 - Output package, installer, dan ZIP Windows lewat Electron Forge.
 
 ## Menjalankan Mode Development
@@ -92,7 +92,7 @@ Developer Mode bisa diaktifkan dari Pengaturan. Saat aktif, menu Developer muncu
 
 Mini Bar adalah overlay kecil frameless dan always-on-top. Mini Bar menampilkan SSID, pemakaian hari ini, sesi saat ini, aplikasi teratas, status batas, serta tombol ikon kecil untuk refresh, membuka app utama, reset sesi, atau menyembunyikan Mini Bar. Mini Bar dibuat untuk dipakai saat gaming atau multitasking, jadi tidak menampilkan detail teknis panjang.
 
-Tampilan Mini Bar bisa diatur dari Pengaturan > Tampilan > Mini Bar. User bisa memilih mode `minimal`, `standard`, atau `detailed`, ukuran `compact`, `normal`, atau `wide`, posisi layar, opacity, lock posisi, informasi yang ditampilkan, serta tombol mana saja yang muncul.
+Tampilan Mini Bar bisa diatur dari halaman Mini Bar. User bisa memilih mode `minimal`, `standard`, atau `detailed`, ukuran `compact`, `normal`, atau `wide`, posisi layar, opacity background, mode gaming/click-through, lock posisi, informasi yang ditampilkan, serta tombol mana saja yang muncul.
 
 ## Shortcut Desktop Dan Administrator
 

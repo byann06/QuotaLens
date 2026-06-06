@@ -16,6 +16,8 @@ contextBridge.exposeInMainWorld('quotaLens', {
   getRealPerAppUsage: (options = {}) =>
     ipcRenderer.invoke('quotalens:get-real-per-app-usage', options),
   getDiagnostics: () => ipcRenderer.invoke('quotalens:get-diagnostics'),
+  getStorageStatus: () => ipcRenderer.invoke('quotalens:get-storage-status'),
+  clearSrumCache: () => ipcRenderer.invoke('quotalens:clear-srum-cache'),
   openDataFolder: () => ipcRenderer.invoke('quotalens:open-data-folder'),
   createDesktopShortcut: () => ipcRenderer.invoke('quotalens:create-desktop-shortcut'),
   openMiniBar: () => ipcRenderer.invoke('quotalens:open-mini-bar'),
